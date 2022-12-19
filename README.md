@@ -6,7 +6,7 @@
 
 Saltarelle also allows you to directly share .cs files between Script# and C# projects in order to maintain a common set of utilities/interfaces/etc across both codebases.  This prevents the duplicate work of reimplementing the same business logic in both JavaScript and C# and maintains common strongly-typed interfaces across both sides. The original Saltarelle project was acquired by [Bridge.NET](https://github.com/bridgedotnet) in 2015 and discontinued in favor of their existing product which was not backwards compatible.  More recently, the Bridge.NET project announced it too has shut down.
 
-This project aims to provide a set of utilities to assist is migrating an existing codebase from Saltarelle to TypeScript.
+This project aims to provide a set of utilities to assist in migrating an existing codebase from Saltarelle to TypeScript.
 
 ## Modern Alternatives
 
