@@ -38,6 +38,7 @@ WARNINGS               = NO
 WARN_IF_UNDOCUMENTED   = NO
 WARN_IF_DOC_ERROR      = NO
 WARN_NO_PARAMDOC       = NO
+HAVE_DOT               = NO
 
 INPUT                  = 
 INPUT_ENCODING         = UTF-8
