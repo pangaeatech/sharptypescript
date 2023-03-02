@@ -24,7 +24,7 @@ It is common to have business logic which must be run on both the server-side an
 
 Today, you can run JavaScript/TypeScript code on the server side using [NodeJS](https://nodejs.org/en/).  You can also run C# code on the client-side using [Blazor](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor), which compiles C# code into WebAssembly.  If all you are looking for is to write logic once and have it able to run in both places, you have the option of writing it either in JavaScript/TypeScript or in C# using either of these tools.
 
-_If you need/wish to write your client-side primarily in TypeScript and your server-side primarily in C# and still share logic between them, take a look at [nuget npm crossdeployment](https://github.com/pangaeatech/nuget%5Fnpm%5Fcrossdeployment)._ 
+_If you need/wish to write your client-side primarily in TypeScript and your server-side primarily in C# and still share logic between them, take a look at [nuget-npm-crossdeployment](https://github.com/pangaeatech/nuget%5Fnpm%5Fcrossdeployment)._ 
 
 ### Shared Client-Side and Server-Side Typing
 
