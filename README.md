@@ -6,7 +6,7 @@
 
 Saltarelle also allows you to directly share .cs files between Script# and C# projects in order to maintain a common set of utilities/interfaces/etc across both codebases.  This prevents the duplicate work of reimplementing the same business logic in both JavaScript and C# and maintains common strongly-typed interfaces across both sides. The original Saltarelle project was acquired by [Bridge.NET](https://github.com/bridgedotnet) in 2015 and discontinued in favor of their existing product which was not backwards compatible.  More recently, the Bridge.NET project announced it too has shut down.
 
-This project aims to provide a set of utilities to assist in migrating an existing codebase from Saltarelle to TypeScript.
+This project aims to provide tools to assist in migrating an existing codebase from Saltarelle to TypeScript.
 
 ## Modern Alternatives
 
@@ -22,9 +22,9 @@ As of today, [TypeScript](https://www.typescriptlang.org/) is the most popular o
 
 It is common to have business logic which must be run on both the server-side and on the client-side of an application and be kept consistent across both (e.g. calculating whether a user has permission to perform an operation in order to show/hide the appropriate control on the client side; then also calculating it separately on the server side in order to enforce that a user is not able to bypass the client-side check).  If you are using a different programming language on the server-side vs the client-side, you will need to reimplement your logic twice and make sure to keep those implementations consistent over time.
 
-Today, you can run JavaScript/TypeScript code on the server side using [NodeJS](https://nodejs.org/en/).  You can also run C# code on the client-side using [Blazor](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor), which compiles C# code into WebAssembly.  If all you are looking for is to write logic once and have it able to run in both places, you have the option of writing it either in JavaScript/TypeScript or in C# using these tools.
+Today, you can run JavaScript/TypeScript code on the server side using [NodeJS](https://nodejs.org/en/).  You can also run C# code on the client-side using [Blazor](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor), which compiles C# code into WebAssembly.  If all you are looking for is to write logic once and have it able to run in both places, you have the option of writing it either in JavaScript/TypeScript or in C# using either of these tools.
 
-_If you need/wish to write your client-side primarily in TypeScript and your server-side primarily in C# and still share logic between them, take a look at [nuget_npm_crossdeployment](https://github.com/pangaeatech/nuget_npm_crossdeployment)._ 
+_If you need/wish to write your client-side primarily in TypeScript and your server-side primarily in C# and still share logic between them, take a look at [nuget npm crossdeployment](https://github.com/pangaeatech/nuget%5Fnpm%5Fcrossdeployment)._ 
 
 ### Shared Client-Side and Server-Side Typing
 
