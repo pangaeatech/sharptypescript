@@ -32,6 +32,7 @@ SOFTWARE.
 
 import os, re, sys
 from dataclasses import dataclass
+from typing import List, Tuple
 
 #############
 ### TYPES ###
@@ -39,7 +40,7 @@ from dataclasses import dataclass
 
 @dataclass
 class PropDef:
-""" The definition of a property """
+    """ The definition of a property """
 
     name: str
     """ The name of the property """
@@ -52,23 +53,23 @@ class PropDef:
 
 @dataclass
 class MethodDef:
-""" The definition of a class method """
+    """ The definition of a class method """
 
     name: str
     """ The name of the method (if empty string then this is a constructor) """
 
-    params: list[PropDef]
+    params: List[PropDef]
     """ The ordered parameters of the method """
 
     typ: str
     """ The return type of the method (if known). """
 
-    body: list[str]
+    body: List[str]
     """ The lines making up the body of the method. """
 
 @dataclass
-class ClassLink
-""" A reference to another class """
+class ClassLink:
+    """ A reference to another class """
 
     namespace: str
     """ The dot-separated namespace that contains the class. """
@@ -77,28 +78,28 @@ class ClassLink
     """ The name of the class. """
 
 @dataclass
-class ClassDef
-""" The definition of a class """
+class ClassDef:
+    """ The definition of a class """
     namespace: str
     """ The dot-separated namespace that contains the class. """
 
     name: str
     """ The name of the class. """
 
-    methods: list[MethodDef]
+    methods: List[MethodDef]
     """ All of the methods in the class. """
 
-    props: list[PropDef]
+    props: List[PropDef]
     """ All of the properties in the class. """
 
-    links: list[ClassLink]
+    links: List[ClassLink]
     """ The external classes which this class references. """
 
 ######################
 ### Helper Methods ###
 ######################
 
-def read_js(filename: str) -> tuple[str, list[ClassDef]]: 
+def read_js(filename: str) -> Tuple[str, List[ClassDef]]: 
     """
     Reads in the Script# file specified by the given filename and returns its parsed contents.  
 
@@ -109,7 +110,7 @@ def read_js(filename: str) -> tuple[str, list[ClassDef]]:
 
     return ("Type.Scripts", [])
 
-def read_doc(filename: str) -> list[ClassDef]:
+def read_doc(filename: str) -> List[ClassDef]:
     """
     Reads in the XML Doxygen file specified by the given filename and returns its parsed contents.
 
@@ -120,7 +121,7 @@ def read_doc(filename: str) -> list[ClassDef]:
 
     return []
 
-def add_types(defs: list[ClassDef], types: list[ClassDef]) -> None:
+def add_types(defs: List[ClassDef], types: List[ClassDef]) -> None:
     """
     Updates the class definitions found in C{defs} to specify all of the C{typ} data found in C{types}.  This also adds entries 
     to the C{links} list if necessary.
@@ -171,7 +172,7 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
             dst_file = os.path.join(dst_dir, f)
             copy_file(src_file, dst_file, asm_name, ns_name)
 
-def gen_ts(out_dir: str, defs: list[ClassDef]) -> None:
+def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
     """
     Generates the typescript files for each known class in the specified output directory.
 
@@ -182,7 +183,7 @@ def gen_ts(out_dir: str, defs: list[ClassDef]) -> None:
 
     pass
 
-def gen_index(out_dir: str, defs: list[ClassDef]) -> None:
+def gen_index(out_dir: str, defs: List[ClassDef]) -> None:
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
