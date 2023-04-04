@@ -1,13 +1,15 @@
 #!/usr/bin/python3
-# -*- coding: utf-8 -*-
+# -.- coding: utf-8 -.-
 # -.- dependencies: Python 3.7+ -.-
 
 """
-A Tool to assist in migrating an existing codebase from Saltarelle to TypeScript.  
+Salt2Type
+
+A tool to assist in migrating an existing codebase from Script# to TypeScript.  
 
 MIT License
 
-Copyright (c) 2022 Pangaea Information Technologies, Ltd.
+Copyright (c) 2023 Pangaea Information Technologies, Ltd.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,50 +30,168 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import sys, re, os.path
+import os, re, sys
 from dataclasses import dataclass
 
+#############
 ### TYPES ###
+#############
+
+@dataclass
+class PropDef:
+""" The definition of a property """
+
+    name: str
+    """ The name of the property """
+
+    def_val: str
+    """ The default value of the property (if applicable) """
+
+    typ: str
+    """ The type of the property (if known) """
 
 @dataclass
 class MethodDef:
 """ The definition of a class method """
 
-    params: list[str]
+    name: str
+    """ The name of the method (if empty string then this is a constructor) """
+
+    params: list[PropDef]
     """ The ordered parameters of the method """
 
-    paramtypes: list[str]
-    """ The ordered parameter types of the method (if shorter than C{params}, then C{any} is used for any remaining parameters. """
+    typ: str
+    """ The return type of the method (if known). """
 
-    returntype: str
-    """ The return type of the method (if empty string, then C{any} is assumed. """
+    body: list[str]
+    """ The lines making up the body of the method. """
 
+@dataclass
+class ClassLink
+""" A reference to another class """
+
+    namespace: str
+    """ The dot-separated namespace that contains the class. """
+
+    name: str
+    """ The name of the class. """
+
+@dataclass
 class ClassDef
 """ The definition of a class """
-    methods: dict[str, MethodDef]
-    """ Each method is defined by name. The constructor has a name of empty-string. """
+    namespace: str
+    """ The dot-separated namespace that contains the class. """
 
-    properties: dict[str, str]
-    """ Each property is defined by name. The value is what the property is initialized to. """
+    name: str
+    """ The name of the class. """
 
-Classes = dict[str, ClassDef]
-""" A collection of classes where each class is a collection of its methods """
+    methods: list[MethodDef]
+    """ All of the methods in the class. """
 
-Namespaces = dict[str, Classes]
-""" A collection of namespaces where each namespace is a collection of its classes """
+    props: list[PropDef]
+    """ All of the properties in the class. """
 
+    links: list[ClassLink]
+    """ The external classes which this class references. """
+
+######################
 ### Helper Methods ###
+######################
 
-def read_js(filename): 
+def read_js(filename: str) -> tuple[str, list[ClassDef]]: 
     """
     Reads in the Script# file specified by the given filename and returns its parsed contents.  
 
-    @param filename: The file to read from
-    @type filename: C{str}
-    @return: The name to pass to "ss.initAssembly" followed by all of the namespace definitions.
-    @rtype: C{tuple(str, Namespaces)}
+    @param filename: The JS file to read from
+    @return: The name to pass to "ss.initAssembly" followed by all of the class definitions found in the file
     """
-    pass # WRITE ME!
+    # WRITE ME!
+
+    return ("Type.Scripts", [])
+
+def read_doc(filename: str) -> list[ClassDef]:
+    """
+    Reads in the XML Doxygen file specified by the given filename and returns its parsed contents.
+
+    @param filename: The XML file to read from
+    @return: All of the class definitions found in the file.
+    """
+    # WRITE ME!
+
+    return []
+
+def add_types(defs: list[ClassDef], types: list[ClassDef]) -> None:
+    """
+    Updates the class definitions found in C{defs} to specify all of the C{typ} data found in C{types}.  This also adds entries 
+    to the C{links} list if necessary.
+
+    @param defs: The class definitions to modify in-place to add type definitions.
+    @param types: The type definitions to use for lookup.
+    """
+    # WRITE ME!
+
+    pass
+
+def copy_file(in_file: str, out_file: str, asm_name: str, ns_name: str) -> None:
+    """
+    Copies the specified source file to the specified destination file and replacing template keyword with their correct values.
+
+    @param in_file: The template file to read in
+    @param out_file: The output file to create
+    @param asm_name: The name to pass to "ss.initAssembly"
+    @param ns_name: The namespace to export for external use
+    """
+    lines = []
+    with open(in_file, 'r') as f:
+        for line in f:
+            line = line.replace("{{FILENAME}}", "%s.js" % asm_name)
+            line = line.replace("{{LIBNAME}}", ns_name)
+            lines.append(line)
+
+    with open(out_file, 'w') as f:
+        for line in lines:
+            f.write(line)
+
+def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
+    """
+    Copies the C{tpl} contents into the specified output directory (creating it first if it doesn't already exist) and replacing
+    template keywords with their correct values.
+
+    @param out_dir: The output directory
+    @param asm_name: The name to pass to "ss.initAssembly"
+    @param ns_name: The namespace to export for external use
+    """
+    tpl_dir = os.path.join(os.path.dirname(sys.argv[0]), 'tpl')
+    for src_dir, dirs, files in os.walk(tpl_dir):
+        dst_dir = src_dir.replace(tpl_dir, out_dir, 1)
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir)
+        for f in files:
+            src_file = os.path.join(src_dir, f)
+            dst_file = os.path.join(dst_dir, f)
+            copy_file(src_file, dst_file, asm_name, ns_name)
+
+def gen_ts(out_dir: str, defs: list[ClassDef]) -> None:
+    """
+    Generates the typescript files for each known class in the specified output directory.
+
+    @param out_dir: The output directory
+    @param defs: The classes
+    """
+    # WRITE ME!
+
+    pass
+
+def gen_index(out_dir: str, defs: list[ClassDef]) -> None:
+    """
+    Generates the index.ts file exporting each known class in the specified output directory.
+
+    @param out_dir: The output directory
+    @param defs: The classes
+    """
+    # WRITE ME!
+
+    pass
 
 ### Main Method ###
 
@@ -79,17 +199,13 @@ if __name__ == "__main__":
     if len(sys.argv) != 5:
         raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME" % sys.argv[0])
 
-    [ _, jsfile, xmlfile, outdir, nsname ] = sys.argv
+    [ _, js_file, xml_file, out_dir, ns_name ] = sys.argv
 
-    # Read all data in from Script#
-    asmName, namespaces = read_js(jsfile)
+    asm_name, classes = read_js(js_file)
+    types = read_doc(xml_file)
+    add_types(classes, types)
 
-    # Read types in from XML
-    add_types(namespaces, xmlfile)
-
-    # Copy templates to output directory and fill in placeholder text
-    copy_template(outdir)
-
-    # Generate .ts files from data
-    generate_files(outdir, namespaces, asmName, nsname)
+    copy_tpl(out_dir, asm_name, ns_name)
+    gen_ts(out_dir, classes)
+    gen_index(out_dir, classes)
 
