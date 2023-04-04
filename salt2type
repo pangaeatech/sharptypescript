@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+# -.- dependencies: Python 3.7+ -.-
 
 """
 A Tool to assist in migrating an existing codebase from Saltarelle to TypeScript.  
@@ -28,23 +29,67 @@ SOFTWARE.
 """
 
 import sys, re, os.path
+from dataclasses import dataclass
 
-### Global State Variables ###
+### TYPES ###
 
-_asm_name = ""              # The name to pass to "ss.initAssembly"
-_namespaces = { "ss" }      # All defined namespaces corresponding to folders
+@dataclass
+class MethodDef:
+""" The definition of a class method """
 
-def
+    params: list[str]
+    """ The ordered parameters of the method """
+
+    paramtypes: list[str]
+    """ The ordered parameter types of the method (if shorter than C{params}, then C{any} is used for any remaining parameters. """
+
+    returntype: str
+    """ The return type of the method (if empty string, then C{any} is assumed. """
+
+class ClassDef
+""" The definition of a class """
+    methods: dict[str, MethodDef]
+    """ Each method is defined by name. The constructor has a name of empty-string. """
+
+    properties: dict[str, str]
+    """ Each property is defined by name. The value is what the property is initialized to. """
+
+Classes = dict[str, ClassDef]
+""" A collection of classes where each class is a collection of its methods """
+
+Namespaces = dict[str, Classes]
+""" A collection of namespaces where each namespace is a collection of its classes """
 
 ### Helper Methods ###
+
+def read_js(filename): 
+    """
+    Reads in the Script# file specified by the given filename and returns its parsed contents.  
+
+    @param filename: The file to read from
+    @type filename: C{str}
+    @return: The name to pass to "ss.initAssembly" followed by all of the namespace definitions.
+    @rtype: C{tuple(str, Namespaces)}
+    """
+    pass # WRITE ME!
 
 ### Main Method ###
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        raise SystemExit("Usage: %s FOO" % sys.argv[0])
+    if len(sys.argv) != 5:
+        raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME" % sys.argv[0])
 
-    [_, filename, foo, foo ] = sys.argv
+    [ _, jsfile, xmlfile, outdir, nsname ] = sys.argv
 
-    asmName = ""
+    # Read all data in from Script#
+    asmName, namespaces = read_js(jsfile)
+
+    # Read types in from XML
+    add_types(namespaces, xmlfile)
+
+    # Copy templates to output directory and fill in placeholder text
+    copy_template(outdir)
+
+    # Generate .ts files from data
+    generate_files(outdir, namespaces, asmName, nsname)
 
