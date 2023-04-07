@@ -30,7 +30,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import os, re, sys
+import os, re, sys, xml.etree
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -43,39 +43,40 @@ class PropDef:
     """ The definition of a property """
 
     name: str
-    """ The name of the property """
+    """ The name of the property.  The name will be parameterized if the property is generic. """
 
-    def_val: str
-    """ The default value of the property (if applicable) """
+    def_val: str | None
+    """ The default value of the property (if known/applicable) """
 
-    typ: str
-    """ The type of the property (if known) """
+    typ: str | None
+    """ The type of the property (if known). """
+
+    desc: str | None
+    """ The brief description of the property (if known). """
 
 @dataclass
 class MethodDef:
     """ The definition of a class method """
 
     name: str
-    """ The name of the method (if empty string then this is a constructor) """
+    """ 
+    The name of the method (if empty string then this is a constructor). 
+    The name will be parameterized if the method is generic.
+    The name will be prefixed by "operator " if it is implicit.
+    The name will be "this[...]" if it is an indexer.
+    """
 
     params: List[PropDef]
     """ The ordered parameters of the method """
 
-    typ: str
+    typ: str | None
     """ The return type of the method (if known). """
 
-    body: List[str]
-    """ The lines making up the body of the method. """
+    body: List[str] | None
+    """ The lines making up the body of the method (if known). """
 
-@dataclass
-class ClassLink:
-    """ A reference to another class """
-
-    namespace: str
-    """ The dot-separated namespace that contains the class. """
-
-    name: str
-    """ The name of the class. """
+    desc: str | None
+    """ The brief description of the method (if known). """
 
 @dataclass
 class ClassDef:
@@ -86,14 +87,17 @@ class ClassDef:
     name: str
     """ The name of the class. """
 
+    doc_id: str
+    """ The ID used to refer to this class in documentation (if applicable). """
+
     methods: List[MethodDef]
     """ All of the methods in the class. """
 
     props: List[PropDef]
     """ All of the properties in the class. """
 
-    links: List[ClassLink]
-    """ The external classes which this class references. """
+    links: List[str]
+    """ The external classes which this class references. This can be specified as a namespace-qualified class name, or as a doc_id. """
 
 ######################
 ### Helper Methods ###
@@ -110,6 +114,23 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef]]:
 
     return ("Type.Scripts", [])
 
+def to_text(node: xml.etree.Element | None) -> str:
+    """
+    Extracts the text from the specified Element, discarding any tags.  Also removes leading and trailing whitespace.
+    """
+    if node:
+        return "".join(node.itertext()).strip()
+
+    return ""
+
+def to_type(raw_type: str) -> str:
+    """
+    Converts the raw Doxygen type into a valid typescript type.
+    """
+    # WRITE ME!
+
+    return raw_type
+
 def read_doc(filename: str) -> List[ClassDef]:
     """
     Reads in the XML Doxygen file specified by the given filename and returns its parsed contents.
@@ -117,9 +138,47 @@ def read_doc(filename: str) -> List[ClassDef]:
     @param filename: The XML file to read from
     @return: All of the class definitions found in the file.
     """
-    # WRITE ME!
+    classes = {}      # key = `${namespace}.${name}`, value = ClassDef
 
-    return []
+    root = xml.etree.ElementTree.parse(filename).getroot()
+    for compound in root.findall("compounddef"):
+        kind = compound.get("kind")
+
+        if kind in ("class", "interface"):
+            key = compound.find("compoundname").text.replace("::", ".")
+            [ namespace, name ] = key.rsplit('.', 1)
+            doc_id = compound.get("id")
+            methods = []
+            props = []
+            links = []
+
+            classes[key] = ClassDef(namespace, name, doc_id, methods, props, links)
+
+            for member in compound.findall("./sectiondef/memberdef"):
+                kind = member.get("kind")
+                name = member.find("name").text
+                desc = to_text(member.find("briefdescription"))
+                type_node = member.find("type")
+                for ref in type_node.findall("ref"):
+                    links.append(ref.get("refid"))
+                typ = to_type(to_text(type_node))
+
+                if kind in ("property", "variable", "event"):
+                    props.append(PropDef(name, None, typ, desc))
+
+                elif kind == "function":
+                    params = []
+                    for param in member.findall("param"):
+                        pname = param.find("declname").text
+                        ptype_node = member.find("type")
+                        for ref in ptype_node.findall("ref"):
+                            links.append(ref.get("refid"))
+                        ptyp = to_type(to_text(ptype_node))
+                        params.append(PropDef(pname, None, ptyp, None)
+
+                    methods.append(MethodDef(name, params, typ, None, desc))
+
+    return classes.values()
 
 def add_types(defs: List[ClassDef], types: List[ClassDef]) -> None:
     """
@@ -194,7 +253,9 @@ def gen_index(out_dir: str, defs: List[ClassDef]) -> None:
 
     pass
 
+###################
 ### Main Method ###
+###################
 
 if __name__ == "__main__":
     if len(sys.argv) != 5:
