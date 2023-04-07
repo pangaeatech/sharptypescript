@@ -5,7 +5,7 @@
 """
 Salt2Type
 
-A tool to assist in migrating an existing codebase from Script# to TypeScript.  
+A tool to assist in migrating an existing codebase from Script# to TypeScript.
 
 MIT License
 
@@ -30,7 +30,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import os, re, sys, xml.etree
+import os, sys
+from xml.etree import ElementTree
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -38,9 +39,10 @@ from typing import List, Tuple
 ### TYPES ###
 #############
 
+
 @dataclass
 class PropDef:
-    """ The definition of a property """
+    """The definition of a property"""
 
     name: str
     """ The name of the property.  The name will be parameterized if the property is generic. """
@@ -54,13 +56,14 @@ class PropDef:
     desc: str | None
     """ The brief description of the property (if known). """
 
+
 @dataclass
 class MethodDef:
-    """ The definition of a class method """
+    """The definition of a class method"""
 
     name: str
-    """ 
-    The name of the method (if empty string then this is a constructor). 
+    """
+    The name of the method (if empty string then this is a constructor).
     The name will be parameterized if the method is generic.
     The name will be prefixed by "operator " if it is implicit.
     The name will be "this[...]" if it is an indexer.
@@ -78,9 +81,11 @@ class MethodDef:
     desc: str | None
     """ The brief description of the method (if known). """
 
+
 @dataclass
 class ClassDef:
-    """ The definition of a class """
+    """The definition of a class"""
+
     namespace: str
     """ The dot-separated namespace that contains the class. """
 
@@ -99,13 +104,16 @@ class ClassDef:
     links: List[str]
     """ The external classes which this class references. This can be specified as a namespace-qualified class name, or as a doc_id. """
 
+
 ######################
 ### Helper Methods ###
 ######################
 
-def read_js(filename: str) -> Tuple[str, List[ClassDef]]: 
+
+def read_js(filename: str) -> Tuple[str, List[ClassDef]]:
+    # pylint: disable=unused-argument
     """
-    Reads in the Script# file specified by the given filename and returns its parsed contents.  
+    Reads in the Script# file specified by the given filename and returns its parsed contents.
 
     @param filename: The JS file to read from
     @return: The name to pass to "ss.initAssembly" followed by all of the class definitions found in the file
@@ -114,7 +122,8 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef]]:
 
     return ("Type.Scripts", [])
 
-def to_text(node: xml.etree.Element | None) -> str:
+
+def to_text(node: ElementTree.Element | None) -> str:
     """
     Extracts the text from the specified Element, discarding any tags.  Also removes leading and trailing whitespace.
     """
@@ -123,13 +132,16 @@ def to_text(node: xml.etree.Element | None) -> str:
 
     return ""
 
+
 def to_type(raw_type: str) -> str:
+    # pylint: disable=unused-argument
     """
     Converts the raw Doxygen type into a valid typescript type.
     """
     # WRITE ME!
 
     return raw_type
+
 
 def read_doc(filename: str) -> List[ClassDef]:
     """
@@ -138,15 +150,15 @@ def read_doc(filename: str) -> List[ClassDef]:
     @param filename: The XML file to read from
     @return: All of the class definitions found in the file.
     """
-    classes = {}      # key = `${namespace}.${name}`, value = ClassDef
+    classes = {}  # key = `${namespace}.${name}`, value = ClassDef
 
-    root = xml.etree.ElementTree.parse(filename).getroot()
+    root = ElementTree.parse(filename).getroot()
     for compound in root.findall("compounddef"):
         kind = compound.get("kind")
 
         if kind in ("class", "interface"):
             key = compound.find("compoundname").text.replace("::", ".")
-            [ namespace, name ] = key.rsplit('.', 1)
+            [namespace, name] = key.rsplit(".", 1)
             doc_id = compound.get("id")
             methods = []
             props = []
@@ -174,15 +186,17 @@ def read_doc(filename: str) -> List[ClassDef]:
                         for ref in ptype_node.findall("ref"):
                             links.append(ref.get("refid"))
                         ptyp = to_type(to_text(ptype_node))
-                        params.append(PropDef(pname, None, ptyp, None)
+                        params.append(PropDef(pname, None, ptyp, None))
 
                     methods.append(MethodDef(name, params, typ, None, desc))
 
     return classes.values()
 
+
 def add_types(defs: List[ClassDef], types: List[ClassDef]) -> None:
+    # pylint: disable=unused-argument
     """
-    Updates the class definitions found in C{defs} to specify all of the C{typ} data found in C{types}.  This also adds entries 
+    Updates the class definitions found in C{defs} to specify all of the C{typ} data found in C{types}.  This also adds entries
     to the C{links} list if necessary.
 
     @param defs: The class definitions to modify in-place to add type definitions.
@@ -190,7 +204,8 @@ def add_types(defs: List[ClassDef], types: List[ClassDef]) -> None:
     """
     # WRITE ME!
 
-    pass
+    pass # pylint: disable=unnecessary-pass
+
 
 def copy_file(in_file: str, out_file: str, asm_name: str, ns_name: str) -> None:
     """
@@ -202,15 +217,16 @@ def copy_file(in_file: str, out_file: str, asm_name: str, ns_name: str) -> None:
     @param ns_name: The namespace to export for external use
     """
     lines = []
-    with open(in_file, 'r') as f:
-        for line in f:
+    with open(in_file, "r") as fil:
+        for line in fil:
             line = line.replace("{{FILENAME}}", "%s.js" % asm_name)
             line = line.replace("{{LIBNAME}}", ns_name)
             lines.append(line)
 
-    with open(out_file, 'w') as f:
+    with open(out_file, "w") as fil:
         for line in lines:
-            f.write(line)
+            fil.write(line)
+
 
 def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
     """
@@ -221,17 +237,19 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
     @param asm_name: The name to pass to "ss.initAssembly"
     @param ns_name: The namespace to export for external use
     """
-    tpl_dir = os.path.join(os.path.dirname(sys.argv[0]), 'tpl')
-    for src_dir, dirs, files in os.walk(tpl_dir):
+    tpl_dir = os.path.join(os.path.dirname(sys.argv[0]), "tpl")
+    for src_dir, _, files in os.walk(tpl_dir):
         dst_dir = src_dir.replace(tpl_dir, out_dir, 1)
         if not os.path.exists(dst_dir):
             os.makedirs(dst_dir)
-        for f in files:
-            src_file = os.path.join(src_dir, f)
-            dst_file = os.path.join(dst_dir, f)
+        for fil in files:
+            src_file = os.path.join(src_dir, fil)
+            dst_file = os.path.join(dst_dir, fil)
             copy_file(src_file, dst_file, asm_name, ns_name)
 
+
 def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
+    # pylint: disable=unused-argument
     """
     Generates the typescript files for each known class in the specified output directory.
 
@@ -240,9 +258,11 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
     """
     # WRITE ME!
 
-    pass
+    pass # pylint: disable=unnecessary-pass
+
 
 def gen_index(out_dir: str, defs: List[ClassDef]) -> None:
+    # pylint: disable=unused-argument
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
@@ -251,7 +271,8 @@ def gen_index(out_dir: str, defs: List[ClassDef]) -> None:
     """
     # WRITE ME!
 
-    pass
+    pass # pylint: disable=unnecessary-pass
+
 
 ###################
 ### Main Method ###
@@ -261,13 +282,12 @@ if __name__ == "__main__":
     if len(sys.argv) != 5:
         raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME" % sys.argv[0])
 
-    [ _, js_file, xml_file, out_dir, ns_name ] = sys.argv
+    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME] = sys.argv # pylint: disable=unbalanced-tuple-unpacking
 
-    asm_name, classes = read_js(js_file)
-    types = read_doc(xml_file)
-    add_types(classes, types)
+    ASM_NAME, CLASSES = read_js(JS_FILE)
+    TYPES = read_doc(XML_FILE)
+    add_types(CLASSES, TYPES)
 
-    copy_tpl(out_dir, asm_name, ns_name)
-    gen_ts(out_dir, classes)
-    gen_index(out_dir, classes)
-
+    copy_tpl(OUT_DIR, ASM_NAME, NS_NAME)
+    gen_ts(OUT_DIR, CLASSES)
+    gen_index(OUT_DIR, CLASSES)
