@@ -30,6 +30,6 @@ jobs:
 
     - run: pip install -r requirements.txt
 
-    - run: black --check -t py37 salt2type
+    - run: black --check -l 150 -t py37 salt2type
 
     - run: pylint salt2type

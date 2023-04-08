@@ -184,7 +184,11 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line], None))
             i = end_line
 
-        elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = function\((.*)\) \{$" % re.escape(curr_class.var_id), line)):
+        elif (
+            curr_class
+            and curr_class.var_id
+            and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = function\((.*)\) \{$" % re.escape(curr_class.var_id), line))
+        ):
             # Class method
             params = []
             for prop in match.group(2).split(", "):
