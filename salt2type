@@ -113,10 +113,10 @@ class ClassDef:
     interfaces: List[str]
     """ The interfaces that this class extends (if known/applicable). """
 
-    is_generic: int
+    is_generic: int = 0
     """ If non-zero then the class is generic (0 if non-generic OR if unknown). """
 
-    is_enum: bool | None
+    is_enum: bool | None = None
     """ Whether or not this class should be treated as an enum (None if unknown). """
 
 
@@ -130,7 +130,8 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
     Reads in the Script# file specified by the given filename and returns its parsed contents.
 
     @param filename: The JS file to read from
-    @return: The name to pass to "ss.initAssembly" followed by all of the class definitions found in the file, followed by all of the global statements to execute.
+    @return: The name to pass to "ss.initAssembly" followed by all of the class definitions found in the file, followed by all of the global
+        statements to execute.
     """
     with open(filename, "r") as fil:
         lines = fil.read().splitlines()
@@ -220,7 +221,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
                 curr_class.base_class = inner.group(1)
                 curr_class.interfaces.extend(inner.group(2).split(", "))
             else:
-                raise Error("Unsupported initClass multi-line ending: %s" % final)
+                raise Exception("Unsupported initClass multi-line ending: %s" % final)
 
             i = end_line
 
@@ -240,7 +241,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
                 curr_class.base_class = inner.group(1)
                 curr_class.interfaces.extend(inner.group(2).split(", "))
             else:
-                raise Error("Unsupported initClass single-line ending: %s" % final)
+                raise Exception("Unsupported initClass single-line ending: %s" % final)
 
             i = end_line
 
@@ -255,7 +256,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             elif inner := re.match(r"^, \[(.*)\]$", final):
                 curr_class.interfaces.extend(inner.group(1).split(", "))
             else:
-                raise Error("Unsupported initInterface ending: %s" % final)
+                raise Exception("Unsupported initInterface ending: %s" % final)
 
             i = end_line
 
@@ -278,11 +279,25 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             i = end_line
 
         else:
-            raise Error("Unsupported line: %s" % line)
+            raise Exception("Unsupported line: %s" % line)
 
         i += 1
 
     return asm_name, classes.values(), globs
+
+
+def re_find_index(pattern: str, lines: List[str], start: int) -> int:
+    """
+    Finds the index of the line that matches the regex pattern starting from the specified index.
+    """
+    i = start
+    while i < len(lines):
+        if re.match(pattern, lines[i]):
+            return i
+
+        i += 1
+
+    raise Exception("Could not find match for '%s'" % pattern)
 
 
 def to_text(node: ElementTree.Element | None) -> str:
@@ -318,7 +333,7 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
             # Property
             curr_class.props.append(PropDef(match.group(1), match.group(2), None, None))
         else:
-            raise Error("Unsupported inner class line: %s" % line)
+            raise Exception("Unsupported inner class line: %s" % line)
 
         i += 1
 
