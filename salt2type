@@ -1,0 +1,498 @@
+#!/usr/bin/python3
+# -.- coding: utf-8 -.-
+# -.- dependencies: Python 3.8+ -.-
+
+"""
+Salt2Type
+
+A tool to assist in migrating an existing codebase from Script# to TypeScript.
+
+MIT License
+
+Copyright (c) 2023 Pangaea Information Technologies, Ltd.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+import os, re, sys
+from xml.etree import ElementTree
+from dataclasses import dataclass
+from typing import List, Tuple
+
+#############
+### TYPES ###
+#############
+
+
+@dataclass
+class PropDef:
+    """The definition of a property"""
+
+    name: str
+    """ The name of the property.  The name will be parameterized if the property is generic. """
+
+    def_val: str | None
+    """ The default value of the property (if known/applicable) """
+
+    typ: str | None
+    """ The type of the property (if known). """
+
+    desc: str | None
+    """ The brief description of the property (if known). """
+
+
+@dataclass
+class MethodDef:
+    """The definition of a class method"""
+
+    name: str
+    """
+    The name of the method (if empty string then this is a constructor).
+    The name will be parameterized if the method is generic.
+    The name will be prefixed by "operator " if it is implicit.
+    The name will be "this[...]" if it is an indexer.
+    """
+
+    params: List[PropDef]
+    """ The ordered parameters of the method """
+
+    typ: str | None
+    """ The return type of the method (if known). """
+
+    body: List[str] | None
+    """ The lines making up the body of the method (if known). """
+
+    desc: str | None
+    """ The brief description of the method (if known). """
+
+
+@dataclass
+class ClassDef:
+    """The definition of a class"""
+
+    namespace: str
+    """ The dot-separated namespace that contains the class. """
+
+    name: str
+    """ The name of the class. """
+
+    doc_id: str | None
+    """ The ID used to refer to this class in documentation (if known). """
+
+    methods: List[MethodDef]
+    """ All of the methods in the class. """
+
+    props: List[PropDef]
+    """ All of the properties in the class. """
+
+    links: List[str]
+    """ The external classes which this class references. This can be specified as a namespace-qualified class name, or as a doc_id. """
+
+    var_id: str | None
+    """ The variable name used to refer to this class in Script# (if known). """
+
+    base_class: str | None
+    """ The base class that this class extends (if known/applicable). """
+
+    interfaces: List[str]
+    """ The interfaces that this class extends (if known/applicable). """
+
+    is_generic: int = 0
+    """ If non-zero then the class is generic (0 if non-generic OR if unknown). """
+
+    is_enum: bool | None = None
+    """ Whether or not this class should be treated as an enum (None if unknown). """
+
+
+######################
+### Helper Methods ###
+######################
+
+
+def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
+    """
+    Reads in the Script# file specified by the given filename and returns its parsed contents.
+
+    @param filename: The JS file to read from
+    @return: The name to pass to "ss.initAssembly" followed by all of the class definitions found in the file, followed by all of the global
+        statements to execute.
+    """
+    with open(filename, "r") as fil:
+        lines = fil.read().splitlines()
+
+    asm_name = ""
+    classes = {}  # key = ssVarName, value = ClassDef
+    globs = []
+
+    curr_class: ClassDef | None = None
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        if line in ("(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startsWith("\tss.setMetadata("):
+            pass
+
+        elif re.match(r"^\tglobal\..*;$", line):
+            # single-line global directives
+            globs.append(line)
+
+        elif match := re.match(r"^\tglobal\..*\{$", line):
+            # multi-line global directives
+            end_line = re_find_index(r"^\t\}", lines, i + 1)
+            globs.extend(lines[i : end_line + 1])
+            i = end_line
+
+        elif match := re.match(r"^\tss\.initAssembly\(\$asm, '(.*)'\);$", line):
+            # initAssembly
+            asm_name = match.group(1)
+
+        elif match := re.match(r"^\t\/{80}$", line):
+            # Class separator
+            curr_class = None
+
+        elif match := re.match(r"^\t\/\/ (.*)$", line):
+            # Class name
+            [namespace, name] = match.group(1).rsplit(".", 1)
+            curr_class = ClassDef(namespace, name, None, [], [], [], None, None, [], 0)
+
+        elif curr_class and (match := re.match(r"^\tvar (.*) = function\((.*)\) \{$", line)):
+            # Class constructor
+            var_id = match.group(1)
+            curr_class.var_id = var_id
+            classes[var_id] = curr_class
+            params = []
+            for prop in match.group(2).split(", "):
+                params.append(PropDef(prop, None, None, None))
+
+            end_line = re_find_index(r"^\t\};$", lines, i + 1)
+            curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line], None))
+            i = end_line
+
+        elif (
+            curr_class
+            and curr_class.var_id
+            and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = function\((.*)\) \{$" % re.escape(curr_class.var_id), line))
+        ):
+            # Class method
+            params = []
+            for prop in match.group(2).split(", "):
+                params.append(PropDef(prop, None, None, None))
+
+            end_line = re_find_index(r"^\t\};$", lines, i + 1)
+            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
+            i = end_line
+
+        elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
+            # Class property
+            curr_class.props.append(PropDef(match.group(1), match.group(2), None, None))
+
+        elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{$", line):
+            # Class multi-line definition
+            curr_class = classes[match.group(1)]
+
+            end_line = re_find_index(r"^\t\}", lines, i + 1)
+            add_props(curr_class, lines[i + 1 : end_line], r"\t\t")
+
+            final = lines[end_line]
+            if final == "\t});":
+                pass
+            elif inner := re.match(r"^\t\}, ([^, ]+)\);$", final):
+                curr_class.base_class = inner.group(1)
+            elif inner := re.match(r"^\t\}, null, \[(.*)\]\);$", final):
+                curr_class.interfaces.extend(inner.group(1).split(", "))
+            elif inner := re.match(r"^\t\}, ([^, ]+), \[(.*)\]\);$", final):
+                curr_class.base_class = inner.group(1)
+                curr_class.interfaces.extend(inner.group(2).split(", "))
+            else:
+                raise Exception("Unsupported initClass multi-line ending: %s" % final)
+
+            i = end_line
+
+        elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{(.*)\}(.*)\);$", line):
+            # Class single-line definition
+            curr_class = classes[match.group(1)]
+            add_props(curr_class, match.group(2).strip().split(", "), r"")
+
+            final = match.group(3)
+            if final == "":
+                pass
+            elif inner := re.match(r"^, ([^, ]+)$", final):
+                curr_class.base_class = inner.group(1)
+            elif inner := re.match(r"^, null, \[(.*)\]$", final):
+                curr_class.interfaces.extend(inner.group(1).split(", "))
+            elif inner := re.match(r"^, ([^, ]+), \[(.*)\]$", final):
+                curr_class.base_class = inner.group(1)
+                curr_class.interfaces.extend(inner.group(2).split(", "))
+            else:
+                raise Exception("Unsupported initClass single-line ending: %s" % final)
+
+            i = end_line
+
+        elif match := re.match(r"^\tss\.initInterface\((.*), \$asm, \{(.*)\}(.*)\);$", line):
+            # Interface definition
+            curr_class = classes[match.group(1)]
+            add_props(curr_class, match.group(2).strip().split(", "), r"")
+
+            final = match.group(3)
+            if final == "":
+                pass
+            elif inner := re.match(r"^, \[(.*)\]$", final):
+                curr_class.interfaces.extend(inner.group(1).split(", "))
+            else:
+                raise Exception("Unsupported initInterface ending: %s" % final)
+
+            i = end_line
+
+        elif re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
+            # Generic definition
+            curr_class = classes[match.group(2)]
+            curr_class.is_generic = int(match.group(3))
+
+        elif re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\});$", line):
+            # Enum definition
+            curr_class = classes[match.group(1)]
+            add_props(curr_class, match.group(2).strip().split(", "), r"")
+            curr_class.isEnum = True
+
+        elif line == "\t(function() {":
+            # multi-line initialization functions
+            end_line = re_find_index(r"^\t\}\)\(\);", lines, i + 1)
+            globs.append("")
+            globs.extend(lines[i : end_line + 1])
+            i = end_line
+
+        else:
+            raise Exception("Unsupported line: %s" % line)
+
+        i += 1
+
+    return asm_name, classes.values(), globs
+
+
+def re_find_index(pattern: str, lines: List[str], start: int) -> int:
+    """
+    Finds the index of the line that matches the regex pattern starting from the specified index.
+    """
+    i = start
+    while i < len(lines):
+        if re.match(pattern, lines[i]):
+            return i
+
+        i += 1
+
+    raise Exception("Could not find match for '%s'" % pattern)
+
+
+def to_text(node: ElementTree.Element | None) -> str:
+    """
+    Extracts the text from the specified Element, discarding any tags.  Also removes leading and trailing whitespace.
+    """
+    if node:
+        return "".join(node.itertext()).strip()
+
+    return ""
+
+
+def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
+    """
+    Adds the properties and methods specified in the given source to the
+    specified class.  Uses the prefix to determine the current indentation
+    level.
+    """
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        if match := re.match(r"^%s(.*): function\((.*)\) {$" % prefix, line):
+            # Method
+            params = []
+            for prop in match.group(2).split(", "):
+                params.append(PropDef(prop, None, None, None))
+
+            end_line = re_find_index(r"^%s},?$" % prefix, lines, i + 1)
+            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
+            i = end_line
+        elif match := re.match(r"^%s(.*): (.*[^,]),?$" % prefix, line):
+            # Property
+            curr_class.props.append(PropDef(match.group(1), match.group(2), None, None))
+        else:
+            raise Exception("Unsupported inner class line: %s" % line)
+
+        i += 1
+
+
+def to_type(raw_type: str) -> str:
+    # pylint: disable=unused-argument
+    """
+    Converts the raw Doxygen type into a valid typescript type.
+    """
+    # WRITE ME!
+
+    return raw_type
+
+
+def read_doc(filename: str) -> List[ClassDef]:
+    """
+    Reads in the XML Doxygen file specified by the given filename and returns its parsed contents.
+
+    @param filename: The XML file to read from
+    @return: All of the class definitions found in the file.
+    """
+    classes = {}  # key = `${namespace}.${name}`, value = ClassDef
+
+    root = ElementTree.parse(filename).getroot()
+    for compound in root.findall("compounddef"):
+        kind = compound.get("kind")
+
+        if kind in ("class", "interface"):
+            key = compound.find("compoundname").text.replace("::", ".")
+            [namespace, name] = key.rsplit(".", 1)
+            doc_id = compound.get("id")
+            methods = []
+            props = []
+            links = []
+
+            classes[key] = ClassDef(namespace, name, doc_id, methods, props, links, None, None, [], 0)
+
+            for member in compound.findall("./sectiondef/memberdef"):
+                kind = member.get("kind")
+                name = member.find("name").text
+                desc = to_text(member.find("briefdescription"))
+                type_node = member.find("type")
+                for ref in type_node.findall("ref"):
+                    links.append(ref.get("refid"))
+                typ = to_type(to_text(type_node))
+
+                if kind in ("property", "variable", "event"):
+                    props.append(PropDef(name, None, typ, desc))
+
+                elif kind == "function":
+                    params = []
+                    for param in member.findall("param"):
+                        pname = param.find("declname").text
+                        ptype_node = member.find("type")
+                        for ref in ptype_node.findall("ref"):
+                            links.append(ref.get("refid"))
+                        ptyp = to_type(to_text(ptype_node))
+                        params.append(PropDef(pname, None, ptyp, None))
+
+                    methods.append(MethodDef(name, params, typ, None, desc))
+
+    return classes.values()
+
+
+def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
+    # pylint: disable=unused-argument
+    """
+    Updates the class definitions found in C{defs} to specify all of the documentation details found in C{types}.
+
+    @param defs: The class definitions to modify in-place to add type definitions.
+    @param types: The type definitions to use for lookup.
+    """
+    # WRITE ME!
+
+    pass  # pylint: disable=unnecessary-pass
+
+
+def copy_file(in_file: str, out_file: str, asm_name: str, ns_name: str) -> None:
+    """
+    Copies the specified source file to the specified destination file and replacing template keyword with their correct values.
+
+    @param in_file: The template file to read in
+    @param out_file: The output file to create
+    @param asm_name: The name to pass to "ss.initAssembly"
+    @param ns_name: The namespace to export for external use
+    """
+    lines = []
+    with open(in_file, "r") as fil:
+        for line in fil:
+            line = line.replace("{{FILENAME}}", "%s.js" % asm_name)
+            line = line.replace("{{LIBNAME}}", ns_name)
+            lines.append(line)
+
+    with open(out_file, "w") as fil:
+        for line in lines:
+            fil.write(line)
+
+
+def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
+    """
+    Copies the C{tpl} contents into the specified output directory (creating it first if it doesn't already exist) and replacing
+    template keywords with their correct values.
+
+    @param out_dir: The output directory
+    @param asm_name: The name to pass to "ss.initAssembly"
+    @param ns_name: The namespace to export for external use
+    """
+    tpl_dir = os.path.join(os.path.dirname(sys.argv[0]), "tpl")
+    for src_dir, _, files in os.walk(tpl_dir):
+        dst_dir = src_dir.replace(tpl_dir, out_dir, 1)
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir)
+        for fil in files:
+            src_file = os.path.join(src_dir, fil)
+            dst_file = os.path.join(dst_dir, fil)
+            copy_file(src_file, dst_file, asm_name, ns_name)
+
+
+def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
+    # pylint: disable=unused-argument
+    """
+    Generates the typescript files for each known class in the specified output directory.
+
+    @param out_dir: The output directory
+    @param defs: The classes
+    """
+    # WRITE ME!
+
+    pass  # pylint: disable=unnecessary-pass
+
+
+def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
+    # pylint: disable=unused-argument
+    """
+    Generates the index.ts file exporting each known class in the specified output directory.
+
+    @param out_dir: The output directory
+    @param defs: The classes
+    @param globs: The global method lines
+    """
+    # WRITE ME!
+
+    pass  # pylint: disable=unnecessary-pass
+
+
+###################
+### Main Method ###
+###################
+
+if __name__ == "__main__":
+    if len(sys.argv) != 5:
+        raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME" % sys.argv[0])
+
+    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME] = sys.argv  # pylint: disable=unbalanced-tuple-unpacking
+
+    ASM_NAME, CLASSES, GLOBALS = read_js(JS_FILE)
+    TYPES = read_doc(XML_FILE)
+    add_doc_info(CLASSES, TYPES)
+
+    copy_tpl(OUT_DIR, ASM_NAME, NS_NAME)
+    gen_ts(OUT_DIR, CLASSES)
+    gen_index(OUT_DIR, CLASSES, GLOBALS)
