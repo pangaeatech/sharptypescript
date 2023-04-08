@@ -30,7 +30,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import os, sys
+import os, re, sys
 from xml.etree import ElementTree
 from dataclasses import dataclass
 from typing import List, Tuple
@@ -92,8 +92,8 @@ class ClassDef:
     name: str
     """ The name of the class. """
 
-    doc_id: str
-    """ The ID used to refer to this class in documentation (if applicable). """
+    doc_id: str | None
+    """ The ID used to refer to this class in documentation (if known). """
 
     methods: List[MethodDef]
     """ All of the methods in the class. """
@@ -104,23 +104,181 @@ class ClassDef:
     links: List[str]
     """ The external classes which this class references. This can be specified as a namespace-qualified class name, or as a doc_id. """
 
+    var_id: str | None
+    """ The variable name used to refer to this class in Script# (if known). """
+
+    base_class: str | None
+    """ The base class that this class extends (if known/applicable). """
+
+    interfaces: List[str]
+    """ The interfaces that this class extends (if known/applicable). """
+
+    is_generic: int
+    """ If non-zero then the class is generic (0 if non-generic OR if unknown). """
+
+    is_enum: bool | None
+    """ Whether or not this class should be treated as an enum (None if unknown). """
+
 
 ######################
 ### Helper Methods ###
 ######################
 
 
-def read_js(filename: str) -> Tuple[str, List[ClassDef]]:
-    # pylint: disable=unused-argument
+def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
     """
     Reads in the Script# file specified by the given filename and returns its parsed contents.
 
     @param filename: The JS file to read from
-    @return: The name to pass to "ss.initAssembly" followed by all of the class definitions found in the file
+    @return: The name to pass to "ss.initAssembly" followed by all of the class definitions found in the file, followed by all of the global statements to execute.
     """
-    # WRITE ME!
+    with open(filename, "r") as fil:
+        lines = fil.read().splitlines()
 
-    return ("Type.Scripts", [])
+    asm_name = ""
+    classes = {}  # key = ssVarName, value = ClassDef
+    globs = []
+
+    curr_class: ClassDef | None = None
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        if line in ("(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startsWith("\tss.setMetadata("):
+            pass
+
+        elif re.match(r"^\tglobal\..*;$", line):
+            # single-line global directives
+            globs.append(line)
+
+        elif match := re.match(r"^\tglobal\..*\{$", line):
+            # multi-line global directives
+            end_line = re_find_index(r"^\t\}", lines, i + 1)
+            globs.extend(lines[i : end_line + 1])
+            i = end_line
+
+        elif match := re.match(r"^\tss\.initAssembly\(\$asm, '(.*)'\);$", line):
+            # initAssembly
+            asm_name = match.group(1)
+
+        elif match := re.match(r"^\t\/{80}$", line):
+            # Class separator
+            curr_class = None
+
+        elif match := re.match(r"^\t\/\/ (.*)$", line):
+            # Class name
+            [namespace, name] = match.group(1).rsplit(".", 1)
+            curr_class = ClassDef(namespace, name, None, [], [], [], None, None, [], 0)
+
+        elif curr_class and (match := re.match(r"^\tvar (.*) = function\((.*)\) \{$", line)):
+            # Class constructor
+            var_id = match.group(1)
+            curr_class.var_id = var_id
+            classes[var_id] = curr_class
+            params = []
+            for prop in match.group(2).split(", "):
+                params.append(PropDef(prop, None, None, None))
+
+            end_line = re_find_index(r"^\t\};$", lines, i + 1)
+            curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line], None))
+            i = end_line
+
+        elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = function\((.*)\) \{$" % re.escape(curr_class.var_id), line)):
+            # Class method
+            params = []
+            for prop in match.group(2).split(", "):
+                params.append(PropDef(prop, None, None, None))
+
+            end_line = re_find_index(r"^\t\};$", lines, i + 1)
+            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
+            i = end_line
+
+        elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
+            # Class property
+            curr_class.props.append(PropDef(match.group(1), match.group(2), None, None))
+
+        elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{$", line):
+            # Class multi-line definition
+            curr_class = classes[match.group(1)]
+
+            end_line = re_find_index(r"^\t\}", lines, i + 1)
+            add_props(curr_class, lines[i + 1 : end_line], r"\t\t")
+
+            final = lines[end_line]
+            if final == "\t});":
+                pass
+            elif inner := re.match(r"^\t\}, ([^, ]+)\);$", final):
+                curr_class.base_class = inner.group(1)
+            elif inner := re.match(r"^\t\}, null, \[(.*)\]\);$", final):
+                curr_class.interfaces.extend(inner.group(1).split(", "))
+            elif inner := re.match(r"^\t\}, ([^, ]+), \[(.*)\]\);$", final):
+                curr_class.base_class = inner.group(1)
+                curr_class.interfaces.extend(inner.group(2).split(", "))
+            else:
+                raise Error("Unsupported initClass multi-line ending: %s" % final)
+
+            i = end_line
+
+        elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{(.*)\}(.*)\);$", line):
+            # Class single-line definition
+            curr_class = classes[match.group(1)]
+            add_props(curr_class, match.group(2).strip().split(", "), r"")
+
+            final = match.group(3)
+            if final == "":
+                pass
+            elif inner := re.match(r"^, ([^, ]+)$", final):
+                curr_class.base_class = inner.group(1)
+            elif inner := re.match(r"^, null, \[(.*)\]$", final):
+                curr_class.interfaces.extend(inner.group(1).split(", "))
+            elif inner := re.match(r"^, ([^, ]+), \[(.*)\]$", final):
+                curr_class.base_class = inner.group(1)
+                curr_class.interfaces.extend(inner.group(2).split(", "))
+            else:
+                raise Error("Unsupported initClass single-line ending: %s" % final)
+
+            i = end_line
+
+        elif match := re.match(r"^\tss\.initInterface\((.*), \$asm, \{(.*)\}(.*)\);$", line):
+            # Interface definition
+            curr_class = classes[match.group(1)]
+            add_props(curr_class, match.group(2).strip().split(", "), r"")
+
+            final = match.group(3)
+            if final == "":
+                pass
+            elif inner := re.match(r"^, \[(.*)\]$", final):
+                curr_class.interfaces.extend(inner.group(1).split(", "))
+            else:
+                raise Error("Unsupported initInterface ending: %s" % final)
+
+            i = end_line
+
+        elif re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
+            # Generic definition
+            curr_class = classes[match.group(2)]
+            curr_class.is_generic = int(match.group(3))
+
+        elif re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\});$", line):
+            # Enum definition
+            curr_class = classes[match.group(1)]
+            add_props(curr_class, match.group(2).strip().split(", "), r"")
+            curr_class.isEnum = True
+
+        elif line == "\t(function() {":
+            # multi-line initialization functions
+            end_line = re_find_index(r"^\t\}\)\(\);", lines, i + 1)
+            globs.append("")
+            globs.extend(lines[i : end_line + 1])
+            i = end_line
+
+        else:
+            raise Error("Unsupported line: %s" % line)
+
+        i += 1
+
+    return asm_name, classes.values(), globs
 
 
 def to_text(node: ElementTree.Element | None) -> str:
@@ -131,6 +289,34 @@ def to_text(node: ElementTree.Element | None) -> str:
         return "".join(node.itertext()).strip()
 
     return ""
+
+
+def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
+    """
+    Adds the properties and methods specified in the given source to the
+    specified class.  Uses the prefix to determine the current indentation
+    level.
+    """
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        if match := re.match(r"^%s(.*): function\((.*)\) {$" % prefix, line):
+            # Method
+            params = []
+            for prop in match.group(2).split(", "):
+                params.append(PropDef(prop, None, None, None))
+
+            end_line = re_find_index(r"^%s},?$" % prefix, lines, i + 1)
+            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
+            i = end_line
+        elif match := re.match(r"^%s(.*): (.*[^,]),?$" % prefix, line):
+            # Property
+            curr_class.props.append(PropDef(match.group(1), match.group(2), None, None))
+        else:
+            raise Error("Unsupported inner class line: %s" % line)
+
+        i += 1
 
 
 def to_type(raw_type: str) -> str:
@@ -164,7 +350,7 @@ def read_doc(filename: str) -> List[ClassDef]:
             props = []
             links = []
 
-            classes[key] = ClassDef(namespace, name, doc_id, methods, props, links)
+            classes[key] = ClassDef(namespace, name, doc_id, methods, props, links, None, None, [], 0)
 
             for member in compound.findall("./sectiondef/memberdef"):
                 kind = member.get("kind")
@@ -193,18 +379,17 @@ def read_doc(filename: str) -> List[ClassDef]:
     return classes.values()
 
 
-def add_types(defs: List[ClassDef], types: List[ClassDef]) -> None:
+def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
     # pylint: disable=unused-argument
     """
-    Updates the class definitions found in C{defs} to specify all of the C{typ} data found in C{types}.  This also adds entries
-    to the C{links} list if necessary.
+    Updates the class definitions found in C{defs} to specify all of the documentation details found in C{types}.
 
     @param defs: The class definitions to modify in-place to add type definitions.
     @param types: The type definitions to use for lookup.
     """
     # WRITE ME!
 
-    pass # pylint: disable=unnecessary-pass
+    pass  # pylint: disable=unnecessary-pass
 
 
 def copy_file(in_file: str, out_file: str, asm_name: str, ns_name: str) -> None:
@@ -258,20 +443,21 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
     """
     # WRITE ME!
 
-    pass # pylint: disable=unnecessary-pass
+    pass  # pylint: disable=unnecessary-pass
 
 
-def gen_index(out_dir: str, defs: List[ClassDef]) -> None:
+def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
     # pylint: disable=unused-argument
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
     @param out_dir: The output directory
     @param defs: The classes
+    @param globs: The global method lines
     """
     # WRITE ME!
 
-    pass # pylint: disable=unnecessary-pass
+    pass  # pylint: disable=unnecessary-pass
 
 
 ###################
@@ -282,12 +468,12 @@ if __name__ == "__main__":
     if len(sys.argv) != 5:
         raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME" % sys.argv[0])
 
-    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME] = sys.argv # pylint: disable=unbalanced-tuple-unpacking
+    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME] = sys.argv  # pylint: disable=unbalanced-tuple-unpacking
 
-    ASM_NAME, CLASSES = read_js(JS_FILE)
+    ASM_NAME, CLASSES, GLOBALS = read_js(JS_FILE)
     TYPES = read_doc(XML_FILE)
-    add_types(CLASSES, TYPES)
+    add_doc_info(CLASSES, TYPES)
 
     copy_tpl(OUT_DIR, ASM_NAME, NS_NAME)
     gen_ts(OUT_DIR, CLASSES)
-    gen_index(OUT_DIR, CLASSES)
+    gen_index(OUT_DIR, CLASSES, GLOBALS)
