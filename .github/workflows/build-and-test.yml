@@ -25,11 +25,11 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.7
+        python-version: 3.8
         cache: 'pip'
 
     - run: pip install -r requirements.txt
 
-    - run: black --check -l 150 -t py37 salt2type
+    - run: black --check -l 150 -t py38 salt2type
 
     - run: pylint salt2type
