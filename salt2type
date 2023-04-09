@@ -339,11 +339,25 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
 
 
 def to_type(raw_type: str) -> str:
-    # pylint: disable=unused-argument
     """
     Converts the raw Doxygen type into a valid typescript type.
     """
-    # WRITE ME!
+    optional = "?" in raw_type
+    raw_type = raw_type.replace("?", "").replace("@", "").strip()
+
+    raw_type = re.sub(r"\bbool\b", "boolean", raw_type)
+    raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
+    raw_type = re.sub(r"\bobject\b", "Object", raw_type)
+    raw_type = re.sub(r"\bList\b", "Array", raw_type)
+    raw_type = re.sub(r"\bJsDictionary\b", "Dictionary", raw_type)
+    raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
+    raw_type = re.sub(r"\bDelegate\b", "Action", raw_type)
+
+    raw_type = re.sub(r"^delegate (.*)$", r"Action< \1 >", raw_type)
+    raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
+
+    if optional:
+        return "%s | undefined | null" % raw_type
 
     return raw_type
 
