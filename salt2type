@@ -543,7 +543,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
     @param defs: The classes
     """
     for item in defs:
-        dst_dir = os.path.join(out_dir, item.namespace.replace(".", "/"))
+        dst_dir = os.path.join(out_dir, "src", item.namespace.replace(".", "/"))
         if not os.path.exists(dst_dir):
             os.makedirs(dst_dir)
 
@@ -551,34 +551,34 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
             for link in item.links:
                 other = find_class(link, defs)
                 if other:
-                    fil.writeline("import %s from '%s/%s';" % (other.name, other.namespace.replace(".", "/"), other.name))
+                    fil.write("import %s from '%s/%s';\n" % (other.name, other.namespace.replace(".", "/"), other.name))
 
-            fil.writeline("")
+            fil.write("\n")
 
             if item.is_generic or item.is_enum:
-                fil.writeline("/** %s%s **/" % ("[Generic]" if item.is_generic else "", "[Enum]" if item.is_enum else ""))
+                fil.write("/** %s%s **/\n" % ("[Generic]" if item.is_generic else "", "[Enum]" if item.is_enum else ""))
 
             interfaces = "implements %s " % ", ".join(item.interfaces) if item.interfaces else ""
             baseclass = "extends %s " % item.base_class if item.base_class else ""
-            fil.writeline("export default class %s %s%s{" % (item.name, baseclass, interfaces))
+            fil.write("export default class %s %s%s{\n" % (item.name, baseclass, interfaces))
 
             for prop in item.props:
-                fil.writeline("")
+                fil.write("\n")
                 if prop.desc:
-                    fil.writeline("\t/** %s **/" % prop.desc)
-                fil.writeline("\t%s;" % prop_to_string(prop))
+                    fil.write("\t/** %s **/\n" % prop.desc)
+                fil.write("\t%s;\n" % prop_to_string(prop))
 
             for method in item.methods:
-                fil.writeline("")
+                fil.write("\n")
                 if method.desc:
-                    fil.writeline("\t/** %s **/" % method.desc)
+                    fil.write("\t/** %s **/\n" % method.desc)
                 props = ", ".join(map(prop_to_string, method.params))
-                fil.writeline("\t%s(%s): %s {" % (method.name or "constructor", props, method.typ or "any"))
+                fil.write("\t%s(%s): %s {\n" % (method.name or "constructor", props, method.typ or "any"))
                 for line in method.body:
-                    fil.write(line)
-                fil.writeline("\t}")
+                    fil.write("\t%s\n" % line)
+                fil.write("\t}\n")
 
-            fil.writeline("}")
+            fil.write("}\n")
 
 
 def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
@@ -589,14 +589,14 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
     @param defs: The classes
     @param globs: The global method lines
     """
-    with open(os.path.join(out_dir, "index.ts"), "w") as fil:
+    with open(os.path.join(out_dir, "src", "index.ts"), "w") as fil:
         for item in defs:
             if item.var_id:
-                fil.writeline("import %s from '%s/%s';" % (item.var_id, item.namespace.replace(".", "/"), item.name))
+                fil.write("import %s from '%s/%s';\n" % (item.var_id, item.namespace.replace(".", "/"), item.name))
 
-        fil.writeline("")
+        fil.write("\n")
         for glob in globs:
-            fil.writeline(glob)
+            fil.write("%s\n" % glob)
 
 
 ###################
