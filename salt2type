@@ -33,7 +33,7 @@ SOFTWARE.
 import os, re, sys
 from xml.etree import ElementTree
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 #############
 ### TYPES ###
@@ -58,13 +58,13 @@ class NamedDef:
 class PropDef(NamedDef):
     """The definition of a property"""
 
-    def_val: str | None
+    def_val: Optional[str]
     """ The default value of the property (if known/applicable) """
 
-    typ: str | None
+    typ: Optional[str]
     """ The type of the property (if known). """
 
-    desc: str | None
+    desc: Optional[str]
     """ The brief description of the property (if known). """
 
 
@@ -75,13 +75,13 @@ class MethodDef(NamedDef):
     params: List[PropDef]
     """ The ordered parameters of the method """
 
-    typ: str | None
+    typ: Optional[str]
     """ The return type of the method (if known). """
 
-    body: List[str] | None
+    body: Optional[List[str]]
     """ The lines making up the body of the method (if known). """
 
-    desc: str | None
+    desc: Optional[str]
     """ The brief description of the method (if known). """
 
 
@@ -95,7 +95,7 @@ class ClassDef:
     name: str
     """ The name of the class. """
 
-    doc_id: str | None
+    doc_id: Optional[str]
     """ The ID used to refer to this class in documentation (if known). """
 
     methods: List[MethodDef]
@@ -107,10 +107,10 @@ class ClassDef:
     links: List[str]
     """ The external classes which this class references. This can be specified as a namespace-qualified class name, or as a doc_id. """
 
-    var_id: str | None
+    var_id: Optional[str]
     """ The variable name used to refer to this class in Script# (if known). """
 
-    base_class: str | None
+    base_class: Optional[str]
     """ The base class that this class extends (if known/applicable). """
 
     interfaces: List[str]
@@ -119,7 +119,7 @@ class ClassDef:
     is_generic: int = 0
     """ If non-zero then the class is generic (0 if non-generic OR if unknown). """
 
-    is_enum: bool | None = None
+    is_enum: Optional[bool] = None
     """ Whether or not this class should be treated as an enum (None if unknown). """
 
 
@@ -143,20 +143,20 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
     classes = {}  # key = ssVarName, value = ClassDef
     globs = []
 
-    curr_class: ClassDef | None = None
+    curr_class: Optional[ClassDef] = None
 
     i = 0
     while i < len(lines):
         line = lines[i]
 
-        if line in ("(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startsWith("\tss.setMetadata("):
+        if line in ("\ufeff(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startswith("\tss.setMetadata("):
             pass
 
         elif re.match(r"^\tglobal\..*;$", line):
             # single-line global directives
             globs.append(line)
 
-        elif match := re.match(r"^\tglobal\..*\{$", line):
+        elif match := re.match(r"^\t(global|\$\.fn)\..*\{$", line):
             # multi-line global directives
             end_line = re_find_index(r"^\t\}", lines, i + 1)
             globs.extend(lines[i : end_line + 1])
@@ -263,12 +263,12 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
 
             i = end_line
 
-        elif re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
+        elif match := re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
             # Generic definition
             curr_class = classes[match.group(2)]
             curr_class.is_generic = int(match.group(3))
 
-        elif re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\});$", line):
+        elif match := re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\}\);$", line):
             # Enum definition
             curr_class = classes[match.group(1)]
             add_props(curr_class, match.group(2).strip().split(", "), r"")
@@ -303,7 +303,7 @@ def re_find_index(pattern: str, lines: List[str], start: int) -> int:
     raise Exception("Could not find match for '%s'" % pattern)
 
 
-def to_text(node: ElementTree.Element | None) -> str:
+def to_text(node: Optional[ElementTree.Element]) -> str:
     """
     Extracts the text from the specified Element, discarding any tags.  Also removes leading and trailing whitespace.
     """
@@ -319,6 +319,9 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
     specified class.  Uses the prefix to determine the current indentation
     level.
     """
+    if len(lines) == 1 and lines[0] == "":
+        return
+
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -415,7 +418,7 @@ def read_doc(filename: str) -> List[ClassDef]:
     return classes.values()
 
 
-def find_by_name(items: List[NamedDef], name: str) -> NamedDef | None:
+def find_by_name(items: List[NamedDef], name: str) -> Optional[NamedDef]:
     """
     Finds the specified item by name (if it exists in the specified list.
     """
