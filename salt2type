@@ -41,11 +41,22 @@ from typing import List, Tuple
 
 
 @dataclass
-class PropDef:
-    """The definition of a property"""
+class NamedDef:
+    """Any named item"""
 
     name: str
-    """ The name of the property.  The name will be parameterized if the property is generic. """
+    """
+    The name of the property/method.
+    The name will be parameterized if it is generic.
+    The name will be empty string if it is a constructor method.
+    The name will be prefixed by "operator " if it is an implicit method.
+    The name will be "this[...]" if it is an indexer method.
+    """
+
+
+@dataclass
+class PropDef(NamedDef):
+    """The definition of a property"""
 
     def_val: str | None
     """ The default value of the property (if known/applicable) """
@@ -58,16 +69,8 @@ class PropDef:
 
 
 @dataclass
-class MethodDef:
+class MethodDef(NamedDef):
     """The definition of a class method"""
-
-    name: str
-    """
-    The name of the method (if empty string then this is a constructor).
-    The name will be parameterized if the method is generic.
-    The name will be prefixed by "operator " if it is implicit.
-    The name will be "this[...]" if it is an indexer.
-    """
 
     params: List[PropDef]
     """ The ordered parameters of the method """
@@ -269,7 +272,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             # Enum definition
             curr_class = classes[match.group(1)]
             add_props(curr_class, match.group(2).strip().split(", "), r"")
-            curr_class.isEnum = True
+            curr_class.is_enum = True
 
         elif line == "\t(function() {":
             # multi-line initialization functions
@@ -412,17 +415,58 @@ def read_doc(filename: str) -> List[ClassDef]:
     return classes.values()
 
 
+def find_by_name(items: List[NamedDef], name: str) -> NamedDef | None:
+    """
+    Finds the specified item by name (if it exists in the specified list.
+    """
+    for item in items:
+        if item.name == name:
+            return item
+
+    return None
+
+
 def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
-    # pylint: disable=unused-argument
     """
     Updates the class definitions found in C{defs} to specify all of the documentation details found in C{types}.
 
     @param defs: The class definitions to modify in-place to add type definitions.
     @param types: The type definitions to use for lookup.
     """
-    # WRITE ME!
+    classes = {}  # key = `${namespace}.${name}`, value = ClassDef
+    for curr_class in defs:
+        key = "%s.%s" % (curr_class.namespace, curr_class.name)
+        classes[key] = curr_class
 
-    pass  # pylint: disable=unnecessary-pass
+    for typ in types:
+        key = "%s.%s" % (typ.namespace, typ.name)
+        curr_class = classes.get(key)
+
+        if curr_class:
+            curr_class.doc_id = typ.doc_id
+
+            for method in typ.methods:
+                curr_method = find_by_name(curr_class.methods, method.name)
+
+                if curr_method:
+                    curr_method.typ = method.typ
+                    curr_method.desc = method.desc
+
+                    for param in method.params:
+                        curr_param = find_by_name(curr_method.params, param.name)
+
+                        if curr_param:
+                            curr_param.typ = param.typ
+                            curr_param.desc = param.desc
+
+            for prop in typ.props:
+                curr_prop = find_by_name(curr_class.props, prop.name)
+
+                if curr_prop:
+                    curr_prop.typ = prop.typ
+                    curr_prop.desc = prop.desc
+
+            curr_class.links.extend(typ.links)
 
 
 def copy_file(in_file: str, out_file: str, asm_name: str, ns_name: str) -> None:
