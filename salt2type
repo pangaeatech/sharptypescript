@@ -516,21 +516,72 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
                 copy_file(src_file, dst_file, asm_name, ns_name)
 
 
+def prop_to_string(prop: PropDef) -> str:
+    """
+    Generates a stringified version of the property for typescript
+    """
+    defval = " = %s" % prop.def_val if prop.def_val else ""
+    return "%s: %s%s" % (prop.name, prop.typ or "any", defval)
+
+
+def find_class(link: str, defs: List[ClassDef]) -> Optional[ClassDef]:
+    """
+    Finds the specified class by namespace-qualified class name, var_id or doc_id.
+    """
+    for item in defs:
+        if link in (item.doc_id, item.var_id, "%s.%s" % (item.namespace, item.name)):
+            return item
+
+    return None
+
+
 def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
-    # pylint: disable=unused-argument
     """
     Generates the typescript files for each known class in the specified output directory.
 
     @param out_dir: The output directory
     @param defs: The classes
     """
-    # WRITE ME!
+    for item in defs:
+        dst_dir = os.path.join(out_dir, item.namespace.replace(".", "/"))
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir)
 
-    pass  # pylint: disable=unnecessary-pass
+        with open(os.path.join(dst_dir, "%s.ts" % item.name), "w") as fil:
+            for link in item.links:
+                other = find_class(link, defs)
+                if other:
+                    fil.writeline("import %s from '%s/%s';" % (other.name, other.namespace.replace(".", "/"), other.name))
+
+            fil.writeline("")
+
+            if item.is_generic or item.is_enum:
+                fil.writeline("/** %s%s **/" % ("[Generic]" if item.is_generic else "", "[Enum]" if item.is_enum else ""))
+
+            interfaces = "implements %s " % ", ".join(item.interfaces) if item.interfaces else ""
+            baseclass = "extends %s " % item.base_class if item.base_class else ""
+            fil.writeline("export default class %s %s%s{" % (item.name, baseclass, interfaces))
+
+            for prop in item.props:
+                fil.writeline("")
+                if prop.desc:
+                    fil.writeline("\t/** %s **/" % prop.desc)
+                fil.writeline("\t%s;" % prop_to_string(prop))
+
+            for method in item.methods:
+                fil.writeline("")
+                if method.desc:
+                    fil.writeline("\t/** %s **/" % method.desc)
+                props = ", ".join(map(prop_to_string, method.params))
+                fil.writeline("\t%s(%s): %s {" % (method.name or "constructor", props, method.typ or "any"))
+                for line in method.body:
+                    fil.write(line)
+                fil.writeline("\t}")
+
+            fil.writeline("}")
 
 
 def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
-    # pylint: disable=unused-argument
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
@@ -538,9 +589,14 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
     @param defs: The classes
     @param globs: The global method lines
     """
-    # WRITE ME!
+    with open(os.path.join(out_dir, "index.ts"), "w") as fil:
+        for item in defs:
+            if item.var_id:
+                fil.writeline("import %s from '%s/%s';" % (item.var_id, item.namespace.replace(".", "/"), item.name))
 
-    pass  # pylint: disable=unnecessary-pass
+        fil.writeline("")
+        for glob in globs:
+            fil.writeline(glob)
 
 
 ###################
