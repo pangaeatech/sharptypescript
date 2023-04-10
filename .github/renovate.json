@@ -3,5 +3,5 @@
   "extends": ["github>pangaeatech/.github"],
   "baseBranches": ["main"],
   "branchPrefix": "renovate/",
-  "enabledManagers": ["pip_requirements"]
+  "enabledManagers": ["pip_requirements", "npm"]
 }

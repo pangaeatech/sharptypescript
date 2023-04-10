@@ -33,7 +33,7 @@ SOFTWARE.
 import os, re, sys
 from xml.etree import ElementTree
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 #############
 ### TYPES ###
@@ -41,44 +41,47 @@ from typing import List, Tuple
 
 
 @dataclass
-class PropDef:
-    """The definition of a property"""
+class NamedDef:
+    """Any named item"""
 
     name: str
-    """ The name of the property.  The name will be parameterized if the property is generic. """
+    """
+    The name of the property/method.
+    The name will be parameterized if it is generic.
+    The name will be empty string if it is a constructor method.
+    The name will be prefixed by "operator " if it is an implicit method.
+    The name will be "this[...]" if it is an indexer method.
+    """
 
-    def_val: str | None
+
+@dataclass
+class PropDef(NamedDef):
+    """The definition of a property"""
+
+    def_val: Optional[str]
     """ The default value of the property (if known/applicable) """
 
-    typ: str | None
+    typ: Optional[str]
     """ The type of the property (if known). """
 
-    desc: str | None
+    desc: Optional[str]
     """ The brief description of the property (if known). """
 
 
 @dataclass
-class MethodDef:
+class MethodDef(NamedDef):
     """The definition of a class method"""
-
-    name: str
-    """
-    The name of the method (if empty string then this is a constructor).
-    The name will be parameterized if the method is generic.
-    The name will be prefixed by "operator " if it is implicit.
-    The name will be "this[...]" if it is an indexer.
-    """
 
     params: List[PropDef]
     """ The ordered parameters of the method """
 
-    typ: str | None
+    typ: Optional[str]
     """ The return type of the method (if known). """
 
-    body: List[str] | None
+    body: Optional[List[str]]
     """ The lines making up the body of the method (if known). """
 
-    desc: str | None
+    desc: Optional[str]
     """ The brief description of the method (if known). """
 
 
@@ -92,7 +95,7 @@ class ClassDef:
     name: str
     """ The name of the class. """
 
-    doc_id: str | None
+    doc_id: Optional[str]
     """ The ID used to refer to this class in documentation (if known). """
 
     methods: List[MethodDef]
@@ -104,10 +107,10 @@ class ClassDef:
     links: List[str]
     """ The external classes which this class references. This can be specified as a namespace-qualified class name, or as a doc_id. """
 
-    var_id: str | None
+    var_id: Optional[str]
     """ The variable name used to refer to this class in Script# (if known). """
 
-    base_class: str | None
+    base_class: Optional[str]
     """ The base class that this class extends (if known/applicable). """
 
     interfaces: List[str]
@@ -116,7 +119,7 @@ class ClassDef:
     is_generic: int = 0
     """ If non-zero then the class is generic (0 if non-generic OR if unknown). """
 
-    is_enum: bool | None = None
+    is_enum: Optional[bool] = None
     """ Whether or not this class should be treated as an enum (None if unknown). """
 
 
@@ -140,20 +143,26 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
     classes = {}  # key = ssVarName, value = ClassDef
     globs = []
 
-    curr_class: ClassDef | None = None
+    curr_class: Optional[ClassDef] = None
 
     i = 0
     while i < len(lines):
         line = lines[i]
 
-        if line in ("(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startsWith("\tss.setMetadata("):
+        if line in ("\ufeff(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startswith("\tss.setMetadata("):
             pass
 
         elif re.match(r"^\tglobal\..*;$", line):
             # single-line global directives
             globs.append(line)
 
-        elif match := re.match(r"^\tglobal\..*\{$", line):
+        elif re.match(r"^\t(.*)\.\$ctor1\.prototype = \1\.prototype;$", line) or re.match(
+            r"^\t(.*)\.\$ctor\d\.prototype = \1\.\$ctor\d\.prototype = .*\.prototype;$", line
+        ):
+            # single-line constructor directives
+            globs.append(line)
+
+        elif match := re.match(r"^\t(global|\$\.fn)\..*\{$", line):
             # multi-line global directives
             end_line = re_find_index(r"^\t\}", lines, i + 1)
             globs.extend(lines[i : end_line + 1])
@@ -243,8 +252,6 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             else:
                 raise Exception("Unsupported initClass single-line ending: %s" % final)
 
-            i = end_line
-
         elif match := re.match(r"^\tss\.initInterface\((.*), \$asm, \{(.*)\}(.*)\);$", line):
             # Interface definition
             curr_class = classes[match.group(1)]
@@ -258,18 +265,16 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             else:
                 raise Exception("Unsupported initInterface ending: %s" % final)
 
-            i = end_line
-
-        elif re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
+        elif match := re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
             # Generic definition
             curr_class = classes[match.group(2)]
             curr_class.is_generic = int(match.group(3))
 
-        elif re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\});$", line):
+        elif match := re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\}(, true)?\);$", line):
             # Enum definition
             curr_class = classes[match.group(1)]
             add_props(curr_class, match.group(2).strip().split(", "), r"")
-            curr_class.isEnum = True
+            curr_class.is_enum = True
 
         elif line == "\t(function() {":
             # multi-line initialization functions
@@ -300,7 +305,7 @@ def re_find_index(pattern: str, lines: List[str], start: int) -> int:
     raise Exception("Could not find match for '%s'" % pattern)
 
 
-def to_text(node: ElementTree.Element | None) -> str:
+def to_text(node: Optional[ElementTree.Element]) -> str:
     """
     Extracts the text from the specified Element, discarding any tags.  Also removes leading and trailing whitespace.
     """
@@ -316,6 +321,9 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
     specified class.  Uses the prefix to determine the current indentation
     level.
     """
+    if len(lines) == 1 and lines[0] == "":
+        return
+
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -339,11 +347,25 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
 
 
 def to_type(raw_type: str) -> str:
-    # pylint: disable=unused-argument
     """
     Converts the raw Doxygen type into a valid typescript type.
     """
-    # WRITE ME!
+    optional = "?" in raw_type
+    raw_type = raw_type.replace("?", "").replace("@", "").strip()
+
+    raw_type = re.sub(r"\bbool\b", "boolean", raw_type)
+    raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
+    raw_type = re.sub(r"\bobject\b", "Object", raw_type)
+    raw_type = re.sub(r"\bList\b", "Array", raw_type)
+    raw_type = re.sub(r"\bJsDictionary\b", "Dictionary", raw_type)
+    raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
+    raw_type = re.sub(r"\bDelegate\b", "Action", raw_type)
+
+    raw_type = re.sub(r"^delegate (.*)$", r"Action< \1 >", raw_type)
+    raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
+
+    if optional:
+        return "%s | undefined | null" % raw_type
 
     return raw_type
 
@@ -398,17 +420,58 @@ def read_doc(filename: str) -> List[ClassDef]:
     return classes.values()
 
 
+def find_by_name(items: List[NamedDef], name: str) -> Optional[NamedDef]:
+    """
+    Finds the specified item by name (if it exists in the specified list.
+    """
+    for item in items:
+        if item.name == name:
+            return item
+
+    return None
+
+
 def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
-    # pylint: disable=unused-argument
     """
     Updates the class definitions found in C{defs} to specify all of the documentation details found in C{types}.
 
     @param defs: The class definitions to modify in-place to add type definitions.
     @param types: The type definitions to use for lookup.
     """
-    # WRITE ME!
+    classes = {}  # key = `${namespace}.${name}`, value = ClassDef
+    for curr_class in defs:
+        key = "%s.%s" % (curr_class.namespace, curr_class.name)
+        classes[key] = curr_class
 
-    pass  # pylint: disable=unnecessary-pass
+    for typ in types:
+        key = "%s.%s" % (typ.namespace, typ.name)
+        curr_class = classes.get(key)
+
+        if curr_class:
+            curr_class.doc_id = typ.doc_id
+
+            for method in typ.methods:
+                curr_method = find_by_name(curr_class.methods, method.name)
+
+                if curr_method:
+                    curr_method.typ = method.typ
+                    curr_method.desc = method.desc
+
+                    for param in method.params:
+                        curr_param = find_by_name(curr_method.params, param.name)
+
+                        if curr_param:
+                            curr_param.typ = param.typ
+                            curr_param.desc = param.desc
+
+            for prop in typ.props:
+                curr_prop = find_by_name(curr_class.props, prop.name)
+
+                if curr_prop:
+                    curr_prop.typ = prop.typ
+                    curr_prop.desc = prop.desc
+
+            curr_class.links.extend(typ.links)
 
 
 def copy_file(in_file: str, out_file: str, asm_name: str, ns_name: str) -> None:
@@ -443,30 +506,82 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
     """
     tpl_dir = os.path.join(os.path.dirname(sys.argv[0]), "tpl")
     for src_dir, _, files in os.walk(tpl_dir):
-        dst_dir = src_dir.replace(tpl_dir, out_dir, 1)
-        if not os.path.exists(dst_dir):
-            os.makedirs(dst_dir)
-        for fil in files:
-            src_file = os.path.join(src_dir, fil)
-            dst_file = os.path.join(dst_dir, fil)
-            copy_file(src_file, dst_file, asm_name, ns_name)
+        if "node_modules" not in src_dir:
+            dst_dir = src_dir.replace(tpl_dir, out_dir, 1)
+            if not os.path.exists(dst_dir):
+                os.makedirs(dst_dir)
+            for fil in files:
+                src_file = os.path.join(src_dir, fil)
+                dst_file = os.path.join(dst_dir, fil)
+                copy_file(src_file, dst_file, asm_name, ns_name)
+
+
+def prop_to_string(prop: PropDef) -> str:
+    """
+    Generates a stringified version of the property for typescript
+    """
+    defval = " = %s" % prop.def_val if prop.def_val else ""
+    return "%s: %s%s" % (prop.name, prop.typ or "any", defval)
+
+
+def find_class(link: str, defs: List[ClassDef]) -> Optional[ClassDef]:
+    """
+    Finds the specified class by namespace-qualified class name, var_id or doc_id.
+    """
+    for item in defs:
+        if link in (item.doc_id, item.var_id, "%s.%s" % (item.namespace, item.name)):
+            return item
+
+    return None
 
 
 def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
-    # pylint: disable=unused-argument
     """
     Generates the typescript files for each known class in the specified output directory.
 
     @param out_dir: The output directory
     @param defs: The classes
     """
-    # WRITE ME!
+    for item in defs:
+        dst_dir = os.path.join(out_dir, "src", item.namespace.replace(".", "/"))
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir)
 
-    pass  # pylint: disable=unnecessary-pass
+        with open(os.path.join(dst_dir, "%s.ts" % item.name), "w") as fil:
+            for link in item.links:
+                other = find_class(link, defs)
+                if other:
+                    fil.write("import %s from '%s/%s';\n" % (other.name, other.namespace.replace(".", "/"), other.name))
+
+            fil.write("\n")
+
+            if item.is_generic or item.is_enum:
+                fil.write("/** %s%s **/\n" % ("[Generic]" if item.is_generic else "", "[Enum]" if item.is_enum else ""))
+
+            interfaces = "implements %s " % ", ".join(item.interfaces) if item.interfaces else ""
+            baseclass = "extends %s " % item.base_class if item.base_class else ""
+            fil.write("export default class %s %s%s{\n" % (item.name, baseclass, interfaces))
+
+            for prop in item.props:
+                fil.write("\n")
+                if prop.desc:
+                    fil.write("\t/** %s **/\n" % prop.desc)
+                fil.write("\t%s;\n" % prop_to_string(prop))
+
+            for method in item.methods:
+                fil.write("\n")
+                if method.desc:
+                    fil.write("\t/** %s **/\n" % method.desc)
+                props = ", ".join(map(prop_to_string, method.params))
+                fil.write("\t%s(%s): %s {\n" % (method.name or "constructor", props, method.typ or "any"))
+                for line in method.body:
+                    fil.write("\t%s\n" % line)
+                fil.write("\t}\n")
+
+            fil.write("}\n")
 
 
 def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
-    # pylint: disable=unused-argument
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
@@ -474,9 +589,14 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
     @param defs: The classes
     @param globs: The global method lines
     """
-    # WRITE ME!
+    with open(os.path.join(out_dir, "src", "index.ts"), "w") as fil:
+        for item in defs:
+            if item.var_id:
+                fil.write("import %s from '%s/%s';\n" % (item.var_id, item.namespace.replace(".", "/"), item.name))
 
-    pass  # pylint: disable=unnecessary-pass
+        fil.write("\n")
+        for glob in globs:
+            fil.write("%s\n" % glob)
 
 
 ###################

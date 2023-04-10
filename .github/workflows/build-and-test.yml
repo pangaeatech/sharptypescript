@@ -2,10 +2,10 @@ name: Lint
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
@@ -16,20 +16,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        clean: true
-        lfs: true
-        submodules: true
+      - uses: actions/checkout@v3
+        with:
+          clean: true
+          lfs: true
+          submodules: true
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.8
-        cache: 'pip'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.8
+          cache: "pip"
 
-    - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt
 
-    - run: black --check -l 150 -t py38 salt2type
+      - run: black --check .
 
-    - run: pylint salt2type
+      - run: pylint salt2type
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+
+      - run: npm install
+        working-directory: tpl
+
+      - run: npx prettier --check ..
+        working-directory: tpl
