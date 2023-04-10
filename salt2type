@@ -188,7 +188,8 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             classes[var_id] = curr_class
             params = []
             for prop in match.group(2).split(", "):
-                params.append(PropDef(prop, None, None, None))
+                if prop:
+                    params.append(PropDef(prop, None, None, None))
 
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
             curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line], None))
@@ -202,7 +203,8 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             # Class method
             params = []
             for prop in match.group(2).split(", "):
-                params.append(PropDef(prop, None, None, None))
+                if prop:
+                    params.append(PropDef(prop, None, None, None))
 
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
             curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
@@ -280,7 +282,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             # multi-line initialization functions
             end_line = re_find_index(r"^\t\}\)\(\);", lines, i + 1)
             globs.append("")
-            globs.extend(lines[i : end_line + 1])
+            globs.extend(lines[i + 1 : end_line])
             i = end_line
 
         else:
@@ -332,7 +334,8 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
             # Method
             params = []
             for prop in match.group(2).split(", "):
-                params.append(PropDef(prop, None, None, None))
+                if prop:
+                    params.append(PropDef(prop, None, None, None))
 
             end_line = re_find_index(r"^%s},?$" % prefix, lines, i + 1)
             curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
