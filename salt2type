@@ -156,7 +156,9 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             # single-line global directives
             globs.append(line)
 
-        elif re.match(r"^\t(.*)\.\$ctor1\.prototype = \1\.prototype;$", line) or re.match(r"^\t(.*)\.\$ctor\d\.prototype = \1\.\$ctor\d\.prototype = .*\.prototype;$", line):
+        elif re.match(r"^\t(.*)\.\$ctor1\.prototype = \1\.prototype;$", line) or re.match(
+            r"^\t(.*)\.\$ctor\d\.prototype = \1\.\$ctor\d\.prototype = .*\.prototype;$", line
+        ):
             # single-line constructor directives
             globs.append(line)
 
@@ -512,7 +514,7 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
                 src_file = os.path.join(src_dir, fil)
                 dst_file = os.path.join(dst_dir, fil)
                 copy_file(src_file, dst_file, asm_name, ns_name)
-    
+
 
 def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
     # pylint: disable=unused-argument
