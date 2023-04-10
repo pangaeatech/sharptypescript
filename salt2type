@@ -156,6 +156,10 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             # single-line global directives
             globs.append(line)
 
+        elif re.match(r"^\t(.*)\.\$ctor1\.prototype = \1\.prototype;$", line) or re.match(r"^\t(.*)\.\$ctor\d\.prototype = \1\.\$ctor\d\.prototype = .*\.prototype;$", line):
+            # single-line constructor directives
+            globs.append(line)
+
         elif match := re.match(r"^\t(global|\$\.fn)\..*\{$", line):
             # multi-line global directives
             end_line = re_find_index(r"^\t\}", lines, i + 1)
@@ -246,8 +250,6 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             else:
                 raise Exception("Unsupported initClass single-line ending: %s" % final)
 
-            i = end_line
-
         elif match := re.match(r"^\tss\.initInterface\((.*), \$asm, \{(.*)\}(.*)\);$", line):
             # Interface definition
             curr_class = classes[match.group(1)]
@@ -261,14 +263,12 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             else:
                 raise Exception("Unsupported initInterface ending: %s" % final)
 
-            i = end_line
-
         elif match := re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
             # Generic definition
             curr_class = classes[match.group(2)]
             curr_class.is_generic = int(match.group(3))
 
-        elif match := re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\}\);$", line):
+        elif match := re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\}(, true)?\);$", line):
             # Enum definition
             curr_class = classes[match.group(1)]
             add_props(curr_class, match.group(2).strip().split(", "), r"")
@@ -504,14 +504,15 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
     """
     tpl_dir = os.path.join(os.path.dirname(sys.argv[0]), "tpl")
     for src_dir, _, files in os.walk(tpl_dir):
-        dst_dir = src_dir.replace(tpl_dir, out_dir, 1)
-        if not os.path.exists(dst_dir):
-            os.makedirs(dst_dir)
-        for fil in files:
-            src_file = os.path.join(src_dir, fil)
-            dst_file = os.path.join(dst_dir, fil)
-            copy_file(src_file, dst_file, asm_name, ns_name)
-
+        if "node_modules" not in src_dir:
+            dst_dir = src_dir.replace(tpl_dir, out_dir, 1)
+            if not os.path.exists(dst_dir):
+                os.makedirs(dst_dir)
+            for fil in files:
+                src_file = os.path.join(src_dir, fil)
+                dst_file = os.path.join(dst_dir, fil)
+                copy_file(src_file, dst_file, asm_name, ns_name)
+    
 
 def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
     # pylint: disable=unused-argument
