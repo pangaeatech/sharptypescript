@@ -50,8 +50,8 @@ However, if you need/wish to write your client-side code in TypeScript and your 
 4. Post-Migration Validation and Cleanup
     - `cd OUTDIR`
     - `npm install`
-    - `npm run format:fix`
     - `npm run lint:fix`
+    - `npm run format:fix`
     - `npm run typecheck`
     - `npm run build`
 

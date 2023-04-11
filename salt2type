@@ -33,7 +33,7 @@ SOFTWARE.
 import os, re, sys
 from xml.etree import ElementTree
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, TextIO
 
 #############
 ### TYPES ###
@@ -551,11 +551,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
             os.makedirs(dst_dir)
 
         with open(os.path.join(dst_dir, "%s.ts" % item.name), "w") as fil:
-            for link in item.links:
-                other = find_class(link, defs)
-                if other:
-                    fil.write("import %s from '%s/%s';\n" % (other.name, other.namespace.replace(".", "/"), other.name))
-
+            write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id)
             fil.write("\n")
 
             if item.is_generic or item.is_enum:
@@ -576,12 +572,28 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
                 if method.desc:
                     fil.write("\t/** %s **/\n" % method.desc)
                 props = ", ".join(map(prop_to_string, method.params))
-                fil.write("\t%s(%s): %s {\n" % (method.name or "constructor", props, method.typ or "any"))
+                if method.name:
+                    fil.write("\t%s(%s): %s {\n" % (method.name, props, method.typ or "any"))
+                else:
+                    fil.write("\tconstructor(%s) {\n" % props)
                 for line in method.body:
                     fil.write("\t%s\n" % line)
                 fil.write("\t}\n")
 
             fil.write("}\n")
+
+
+def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_var_id: Optional[str] = None) -> None:
+    """Writes all imports to the specified output stream except the specified ignore item"""
+    out_file.write("import Enumerable from 'linq';\n")
+
+    go_up = re.sub(r"[^\/]+", "..", curr_dir) or "."
+
+    for item in defs:
+        if item.var_id and item.var_id != ignore_var_id:
+            out_file.write("import %s from '%s/%s/%s';\n" % (item.var_id, go_up,  item.namespace.replace(".", "/"), item.name))
+
+    out_file.write("declare var ss: any;\n")
 
 
 def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
@@ -593,9 +605,7 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
     @param globs: The global method lines
     """
     with open(os.path.join(out_dir, "src", "index.ts"), "w") as fil:
-        for item in defs:
-            if item.var_id:
-                fil.write("import %s from '%s/%s';\n" % (item.var_id, item.namespace.replace(".", "/"), item.name))
+        write_imports(defs, fil, "")
 
         fil.write("\n")
         for glob in globs:
