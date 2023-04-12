@@ -33,7 +33,7 @@ SOFTWARE.
 import os, re, sys
 from xml.etree import ElementTree
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, TextIO
 
 #############
 ### TYPES ###
@@ -41,48 +41,54 @@ from typing import List, Tuple, Optional
 
 
 @dataclass
-class NamedDef:
-    """Any named item"""
+class PropDef:
+    """The definition of a property"""
+
+    name: str
+    """ the name of the property.  the name will be parameterized if it is generic. """
+
+    def_val: Optional[str] = None
+    """ The default value of the property (if known/applicable) """
+
+    typ: Optional[str] = None
+    """ The type of the property (if known). """
+
+    desc: Optional[str] = None
+    """ The brief description of the property (if known). """
+
+    is_rest: Optional[bool] = None
+    """ Whether or not this is a rest parameter (None if unknown). """
+
+
+@dataclass
+class MethodDef:
+    """The definition of a class method"""
 
     name: str
     """
-    The name of the property/method.
-    The name will be parameterized if it is generic.
-    The name will be empty string if it is a constructor method.
-    The name will be prefixed by "operator " if it is an implicit method.
-    The name will be "this[...]" if it is an indexer method.
+    the name of the method (empty string if it is the constructor).
+    the name will be parameterized if it is generic.
+    the name will be prefixed by "operator " if it is implicit.
+    the name will be "this[...]" if it is an indexer.
     """
-
-
-@dataclass
-class PropDef(NamedDef):
-    """The definition of a property"""
-
-    def_val: Optional[str]
-    """ The default value of the property (if known/applicable) """
-
-    typ: Optional[str]
-    """ The type of the property (if known). """
-
-    desc: Optional[str]
-    """ The brief description of the property (if known). """
-
-
-@dataclass
-class MethodDef(NamedDef):
-    """The definition of a class method"""
 
     params: List[PropDef]
     """ The ordered parameters of the method """
 
-    typ: Optional[str]
+    typ: Optional[str] = None
     """ The return type of the method (if known). """
 
-    body: Optional[List[str]]
+    body: Optional[List[str]] = None
     """ The lines making up the body of the method (if known). """
 
-    desc: Optional[str]
+    desc: Optional[str] = None
     """ The brief description of the method (if known). """
+
+    protection: Optional[str] = None
+    """ The protection level for the method (None if unknown). """
+
+    is_static: Optional[bool] = None
+    """ Whether or not this method is static (None if unknown). """
 
 
 @dataclass
@@ -188,10 +194,11 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             classes[var_id] = curr_class
             params = []
             for prop in match.group(2).split(", "):
-                params.append(PropDef(prop, None, None, None))
+                if prop:
+                    params.append(PropDef(prop))
 
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
-            curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line], None))
+            curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line]))
             i = end_line
 
         elif (
@@ -202,15 +209,16 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             # Class method
             params = []
             for prop in match.group(2).split(", "):
-                params.append(PropDef(prop, None, None, None))
+                if prop:
+                    params.append(PropDef(prop))
 
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
-            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
+            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line]))
             i = end_line
 
         elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
             # Class property
-            curr_class.props.append(PropDef(match.group(1), match.group(2), None, None))
+            curr_class.props.append(PropDef(match.group(1), match.group(2)))
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{$", line):
             # Class multi-line definition
@@ -280,7 +288,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             # multi-line initialization functions
             end_line = re_find_index(r"^\t\}\)\(\);", lines, i + 1)
             globs.append("")
-            globs.extend(lines[i : end_line + 1])
+            globs.extend(lines[i + 1 : end_line])
             i = end_line
 
         else:
@@ -309,7 +317,7 @@ def to_text(node: Optional[ElementTree.Element]) -> str:
     """
     Extracts the text from the specified Element, discarding any tags.  Also removes leading and trailing whitespace.
     """
-    if node:
+    if node is not None:
         return "".join(node.itertext()).strip()
 
     return ""
@@ -332,14 +340,15 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
             # Method
             params = []
             for prop in match.group(2).split(", "):
-                params.append(PropDef(prop, None, None, None))
+                if prop:
+                    params.append(PropDef(prop))
 
             end_line = re_find_index(r"^%s},?$" % prefix, lines, i + 1)
-            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
+            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line]))
             i = end_line
         elif match := re.match(r"^%s(.*): (.*[^,]),?$" % prefix, line):
             # Property
-            curr_class.props.append(PropDef(match.group(1), match.group(2), None, None))
+            curr_class.props.append(PropDef(match.group(1), match.group(2)))
         else:
             raise Exception("Unsupported inner class line: %s" % line)
 
@@ -355,7 +364,6 @@ def to_type(raw_type: str) -> str:
 
     raw_type = re.sub(r"\bbool\b", "boolean", raw_type)
     raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
-    raw_type = re.sub(r"\bobject\b", "Object", raw_type)
     raw_type = re.sub(r"\bList\b", "Array", raw_type)
     raw_type = re.sub(r"\bJsDictionary\b", "Dictionary", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
@@ -395,38 +403,73 @@ def read_doc(filename: str) -> List[ClassDef]:
 
             for member in compound.findall("./sectiondef/memberdef"):
                 kind = member.get("kind")
-                name = member.find("name").text
+                prot = member.get("prot")
+                is_static = member.get("static") == "yes"
+                mname = member.find("name").text
                 desc = to_text(member.find("briefdescription"))
                 type_node = member.find("type")
                 for ref in type_node.findall("ref"):
                     links.append(ref.get("refid"))
                 typ = to_type(to_text(type_node))
+                if not typ and mname == name:
+                    typ = name
 
                 if kind in ("property", "variable", "event"):
-                    props.append(PropDef(name, None, typ, desc))
+                    props.append(PropDef(mname, None, typ, desc))
+                    methods.append(MethodDef("get_%s" % mname, [], typ, None, desc, prot, is_static))
+                    methods.append(MethodDef("get_$%s" % mname, [], typ, None, desc, prot, is_static))
+                    methods.append(MethodDef("set_%s" % mname, [PropDef("value", None, typ)], "void", None, desc, prot, is_static))
+                    methods.append(MethodDef("set_$%s" % mname, [PropDef("value", None, typ)], "void", None, desc, prot, is_static))
 
                 elif kind == "function":
                     params = []
                     for param in member.findall("param"):
                         pname = param.find("declname").text
-                        ptype_node = member.find("type")
+                        ptype_node = param.find("type")
                         for ref in ptype_node.findall("ref"):
                             links.append(ref.get("refid"))
                         ptyp = to_type(to_text(ptype_node))
-                        params.append(PropDef(pname, None, ptyp, None))
+                        prest = to_text(ptype_node).startswith("params ")
+                        params.append(PropDef(pname, None, ptyp, None, prest))
 
-                    methods.append(MethodDef(name, params, typ, None, desc))
+                    methods.append(MethodDef(mname if mname != name else "", params, typ, None, desc, prot, is_static))
 
     return classes.values()
 
 
-def find_by_name(items: List[NamedDef], name: str) -> Optional[NamedDef]:
+def find_prop(items: List[PropDef], name: str) -> Optional[PropDef]:
     """
-    Finds the specified item by name (if it exists in the specified list.
+    Finds the specified property by name (if it exists in the specified list.
     """
     for item in items:
-        if item.name == name:
+        if item.name.lower() == name.lower():
             return item
+        if item.is_rest and re.match(r"^%s[1-9]$" % re.escape(name), item.name, re.IGNORECASE):
+            return item
+
+    return None
+
+
+def find_method(items: List[MethodDef], name: str, args: int) -> Optional[MethodDef]:
+    """
+    Finds the specified method by name and number of arguments (if it exists in the specified list.
+    """
+    matches = [
+        item
+        for item in items
+        if item.name.lower() == name.lower()
+        or item.name == "$" + name[:1].lower() + name[1:]
+        or item.name.startswith("$" + name[:1].lower() + name[1:] + "$")
+        or re.match(r"^%s\$[1-9]$" % re.escape(name), item.name, re.IGNORECASE)
+        or (name == "" and item.name.startswith("$ctor"))
+    ]
+
+    for item in matches:
+        if len(item.params) == args:
+            return item
+
+    if matches:
+        return matches[0]
 
     return None
 
@@ -451,25 +494,29 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
             curr_class.doc_id = typ.doc_id
 
             for method in typ.methods:
-                curr_method = find_by_name(curr_class.methods, method.name)
+                curr_method = find_method(curr_class.methods, method.name, len(method.params))
 
                 if curr_method:
                     curr_method.typ = method.typ
                     curr_method.desc = method.desc
+                    curr_method.protection = method.protection
+                    curr_method.is_static = method.is_static
 
                     for param in method.params:
-                        curr_param = find_by_name(curr_method.params, param.name)
+                        curr_param = find_prop(curr_method.params, param.name)
 
                         if curr_param:
                             curr_param.typ = param.typ
                             curr_param.desc = param.desc
+                            curr_param.is_rest = param.is_rest
 
             for prop in typ.props:
-                curr_prop = find_by_name(curr_class.props, prop.name)
+                curr_prop = find_prop(curr_class.props, prop.name)
 
                 if curr_prop:
                     curr_prop.typ = prop.typ
                     curr_prop.desc = prop.desc
+                    curr_prop.is_rest = prop.is_rest
 
             curr_class.links.extend(typ.links)
 
@@ -521,7 +568,8 @@ def prop_to_string(prop: PropDef) -> str:
     Generates a stringified version of the property for typescript
     """
     defval = " = %s" % prop.def_val if prop.def_val else ""
-    return "%s: %s%s" % (prop.name, prop.typ or "any", defval)
+    typstr = ": %s" % (prop.typ or "any") if not defval or prop.typ else ""
+    return "%s%s%s%s" % ("..." if prop.is_rest else "", prop.name, typstr, defval)
 
 
 def find_class(link: str, defs: List[ClassDef]) -> Optional[ClassDef]:
@@ -548,11 +596,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
             os.makedirs(dst_dir)
 
         with open(os.path.join(dst_dir, "%s.ts" % item.name), "w") as fil:
-            for link in item.links:
-                other = find_class(link, defs)
-                if other:
-                    fil.write("import %s from '%s/%s';\n" % (other.name, other.namespace.replace(".", "/"), other.name))
-
+            write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id)
             fil.write("\n")
 
             if item.is_generic or item.is_enum:
@@ -573,12 +617,29 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
                 if method.desc:
                     fil.write("\t/** %s **/\n" % method.desc)
                 props = ", ".join(map(prop_to_string, method.params))
-                fil.write("\t%s(%s): %s {\n" % (method.name or "constructor", props, method.typ or "any"))
+                prot = method.protection if method.protection in ("public", "private", "protected") else ""
+                if method.name:
+                    fil.write("\t%s %s%s(%s): %s {\n" % (prot, "static " if method.is_static else "", method.name, props, method.typ or "any"))
+                else:
+                    fil.write("\tconstructor(%s) {\n" % props)
                 for line in method.body:
                     fil.write("\t%s\n" % line)
                 fil.write("\t}\n")
 
             fil.write("}\n")
+
+
+def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_var_id: Optional[str] = None) -> None:
+    """Writes all imports to the specified output stream except the specified ignore item"""
+    out_file.write("import Enumerable from 'linq';\n")
+
+    go_up = re.sub(r"[^\/]+", "..", curr_dir) or "."
+
+    for item in defs:
+        if item.var_id and item.var_id != ignore_var_id:
+            out_file.write("import %s from '%s/%s/%s';\n" % (item.var_id, go_up, item.namespace.replace(".", "/"), item.name))
+
+    out_file.write("declare var ss: any;\n")
 
 
 def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
@@ -590,9 +651,7 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
     @param globs: The global method lines
     """
     with open(os.path.join(out_dir, "src", "index.ts"), "w") as fil:
-        for item in defs:
-            if item.var_id:
-                fil.write("import %s from '%s/%s';\n" % (item.var_id, item.namespace.replace(".", "/"), item.name))
+        write_imports(defs, fil, "")
 
         fil.write("\n")
         for glob in globs:
