@@ -10,8 +10,8 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "jquery": "^3.6.4",
-    "linq": "^4.0.1"
+    "jquery": "3.6.4",
+    "linq": "4.0.1"
   },
   "devDependencies": {
     "@types/jquery": "3.5.16",
