@@ -75,13 +75,13 @@ class MethodDef:
     params: List[PropDef]
     """ The ordered parameters of the method """
 
-    typ: Optional[str]
+    typ: Optional[str] = None
     """ The return type of the method (if known). """
 
-    body: Optional[List[str]]
+    body: Optional[List[str]] = None
     """ The lines making up the body of the method (if known). """
 
-    desc: Optional[str]
+    desc: Optional[str] = None
     """ The brief description of the method (if known). """
 
     protection: Optional[str] = None
@@ -198,7 +198,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
                     params.append(PropDef(prop))
 
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
-            curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line], None))
+            curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line]))
             i = end_line
 
         elif (
@@ -213,7 +213,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
                     params.append(PropDef(prop))
 
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
-            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
+            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line]))
             i = end_line
 
         elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
@@ -344,7 +344,7 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
                     params.append(PropDef(prop))
 
             end_line = re_find_index(r"^%s},?$" % prefix, lines, i + 1)
-            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
+            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line]))
             i = end_line
         elif match := re.match(r"^%s(.*): (.*[^,]),?$" % prefix, line):
             # Property
@@ -404,6 +404,8 @@ def read_doc(filename: str) -> List[ClassDef]:
 
             for member in compound.findall("./sectiondef/memberdef"):
                 kind = member.get("kind")
+                prot = member.get("prot")
+                is_static = member.get("static") == "yes"
                 mname = member.find("name").text
                 desc = to_text(member.find("briefdescription"))
                 type_node = member.find("type")
@@ -415,10 +417,10 @@ def read_doc(filename: str) -> List[ClassDef]:
 
                 if kind in ("property", "variable", "event"):
                     props.append(PropDef(mname, None, typ, desc))
-                    methods.append(MethodDef("get_%s" % mname, [], typ, None, desc))
-                    methods.append(MethodDef("get_$%s" % mname, [], typ, None, desc))
-                    methods.append(MethodDef("set_%s" % mname, [PropDef("value", None, typ)], "void", None, desc))
-                    methods.append(MethodDef("set_$%s" % mname, [PropDef("value", None, typ)], "void", None, desc))
+                    methods.append(MethodDef("get_%s" % mname, [], typ, None, desc, prot, is_static))
+                    methods.append(MethodDef("get_$%s" % mname, [], typ, None, desc, prot, is_static))
+                    methods.append(MethodDef("set_%s" % mname, [PropDef("value", None, typ)], "void", None, desc, prot, is_static))
+                    methods.append(MethodDef("set_$%s" % mname, [PropDef("value", None, typ)], "void", None, desc, prot, is_static))
 
                 elif kind == "function":
                     params = []
@@ -431,7 +433,7 @@ def read_doc(filename: str) -> List[ClassDef]:
                         prest = to_text(ptype_node).startswith("params ")
                         params.append(PropDef(pname, None, ptyp, None, prest))
 
-                    methods.append(MethodDef(mname if mname != name else "", params, typ, None, desc))
+                    methods.append(MethodDef(mname if mname != name else "", params, typ, None, desc, prot, is_static))
 
     return classes.values()
 
@@ -498,6 +500,8 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
                 if curr_method:
                     curr_method.typ = method.typ
                     curr_method.desc = method.desc
+                    curr_method.protection = method.protection
+                    curr_method.is_static = method.is_static
 
                     for param in method.params:
                         curr_param = find_prop(curr_method.params, param.name)
@@ -505,6 +509,7 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
                         if curr_param:
                             curr_param.typ = param.typ
                             curr_param.desc = param.desc
+                            curr_param.is_rest = param.is_rest
 
             for prop in typ.props:
                 curr_prop = find_prop(curr_class.props, prop.name)
@@ -512,6 +517,7 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
                 if curr_prop:
                     curr_prop.typ = prop.typ
                     curr_prop.desc = prop.desc
+                    curr_prop.is_rest = prop.is_rest
 
             curr_class.links.extend(typ.links)
 
@@ -613,7 +619,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
                     fil.write("\t/** %s **/\n" % method.desc)
                 props = ", ".join(map(prop_to_string, method.params))
                 if method.name:
-                    fil.write("\t%s(%s): %s {\n" % (method.name, props, method.typ or "any"))
+                    fil.write("\t%s %s%s(%s): %s {\n" % (method.protection, "static " if method.is_static else "", method.name, props, method.typ or "any"))
                 else:
                     fil.write("\tconstructor(%s) {\n" % props)
                 for line in method.body:
