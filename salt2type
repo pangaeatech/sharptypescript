@@ -618,10 +618,9 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
                 if method.desc:
                     fil.write("\t/** %s **/\n" % method.desc)
                 props = ", ".join(map(prop_to_string, method.params))
+                prot = method.protection if method.protection in ("public", "private", "protected") else ""
                 if method.name:
-                    fil.write(
-                        "\t%s %s%s(%s): %s {\n" % (method.protection, "static " if method.is_static else "", method.name, props, method.typ or "any")
-                    )
+                    fil.write("\t%s %s%s(%s): %s {\n" % (prot, "static " if method.is_static else "", method.name, props, method.typ or "any"))
                 else:
                     fil.write("\tconstructor(%s) {\n" % props)
                 for line in method.body:
