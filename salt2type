@@ -47,14 +47,17 @@ class PropDef:
     name: str
     """ the name of the property.  the name will be parameterized if it is generic. """
 
-    def_val: Optional[str]
+    def_val: Optional[str] = None
     """ The default value of the property (if known/applicable) """
 
-    typ: Optional[str]
+    typ: Optional[str] = None
     """ The type of the property (if known). """
 
-    desc: Optional[str]
+    desc: Optional[str] = None
     """ The brief description of the property (if known). """
+
+    is_rest: Optional[bool] = None
+    """ Whether or not this is a rest parameter (None if unknown). """
 
 
 @dataclass
@@ -80,6 +83,12 @@ class MethodDef:
 
     desc: Optional[str]
     """ The brief description of the method (if known). """
+
+    protection: Optional[str] = None
+    """ The protection level for the method (None if unknown). """
+
+    is_static: Optional[bool] = None
+    """ Whether or not this method is static (None if unknown). """
 
 
 @dataclass
@@ -186,7 +195,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             params = []
             for prop in match.group(2).split(", "):
                 if prop:
-                    params.append(PropDef(prop, None, None, None))
+                    params.append(PropDef(prop))
 
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
             curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line], None))
@@ -201,7 +210,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             params = []
             for prop in match.group(2).split(", "):
                 if prop:
-                    params.append(PropDef(prop, None, None, None))
+                    params.append(PropDef(prop))
 
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
             curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
@@ -209,7 +218,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
 
         elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
             # Class property
-            curr_class.props.append(PropDef(match.group(1), match.group(2), None, None))
+            curr_class.props.append(PropDef(match.group(1), match.group(2)))
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{$", line):
             # Class multi-line definition
@@ -332,14 +341,14 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
             params = []
             for prop in match.group(2).split(", "):
                 if prop:
-                    params.append(PropDef(prop, None, None, None))
+                    params.append(PropDef(prop))
 
             end_line = re_find_index(r"^%s},?$" % prefix, lines, i + 1)
             curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line], None))
             i = end_line
         elif match := re.match(r"^%s(.*): (.*[^,]),?$" % prefix, line):
             # Property
-            curr_class.props.append(PropDef(match.group(1), match.group(2), None, None))
+            curr_class.props.append(PropDef(match.group(1), match.group(2)))
         else:
             raise Exception("Unsupported inner class line: %s" % line)
 
@@ -395,15 +404,21 @@ def read_doc(filename: str) -> List[ClassDef]:
 
             for member in compound.findall("./sectiondef/memberdef"):
                 kind = member.get("kind")
-                name = member.find("name").text
+                mname = member.find("name").text
                 desc = to_text(member.find("briefdescription"))
                 type_node = member.find("type")
                 for ref in type_node.findall("ref"):
                     links.append(ref.get("refid"))
                 typ = to_type(to_text(type_node))
+                if not typ and mname == name:
+                    typ = name
 
                 if kind in ("property", "variable", "event"):
-                    props.append(PropDef(name, None, typ, desc))
+                    props.append(PropDef(mname, None, typ, desc))
+                    methods.append(MethodDef("get_%s" % mname, [], typ, None, desc))
+                    methods.append(MethodDef("get_$%s" % mname, [], typ, None, desc))
+                    methods.append(MethodDef("set_%s" % mname, [PropDef("value", None, typ)], "void", None, desc))
+                    methods.append(MethodDef("set_$%s" % mname, [PropDef("value", None, typ)], "void", None, desc))
 
                 elif kind == "function":
                     params = []
@@ -413,9 +428,10 @@ def read_doc(filename: str) -> List[ClassDef]:
                         for ref in ptype_node.findall("ref"):
                             links.append(ref.get("refid"))
                         ptyp = to_type(to_text(ptype_node))
-                        params.append(PropDef(pname, None, ptyp, None))
+                        prest = to_text(ptype_node).startswith("params ")
+                        params.append(PropDef(pname, None, ptyp, None, prest))
 
-                    methods.append(MethodDef(name, params, typ, None, desc))
+                    methods.append(MethodDef(mname if mname != name else "", params, typ, None, desc))
 
     return classes.values()
 
@@ -426,6 +442,8 @@ def find_prop(items: List[PropDef], name: str) -> Optional[PropDef]:
     """
     for item in items:
         if item.name.lower() == name.lower():
+            return item
+        if item.is_rest and re.match(r"^%s[1-9]$" % re.escape(name), item.name, re.IGNORECASE):
             return item
 
     return None
@@ -438,7 +456,11 @@ def find_method(items: List[MethodDef], name: str, args: int) -> Optional[Method
     matches = [
         item
         for item in items
-        if item.name == name or item.name == "$" + name[:1].lower() + name[1:] or item.name.startswith("$" + name[:1].lower() + name[1:] + "$")
+        if item.name.lower() == name.lower()
+        or item.name == "$" + name[:1].lower() + name[1:]
+        or item.name.startswith("$" + name[:1].lower() + name[1:] + "$")
+        or re.match(r"^%s\$[1-9]$" % re.escape(name), item.name, re.IGNORECASE)
+        or (name == "" and item.name.startswith("$ctor"))
     ]
 
     for item in matches:
@@ -541,7 +563,8 @@ def prop_to_string(prop: PropDef) -> str:
     Generates a stringified version of the property for typescript
     """
     defval = " = %s" % prop.def_val if prop.def_val else ""
-    return "%s: %s%s" % (prop.name, prop.typ or "any", defval)
+    typstr = ": %s" % (prop.typ or "any") if not defval or prop.typ else ""
+    return "%s%s%s%s" % ("..." if prop.is_rest else "", prop.name, typstr, defval)
 
 
 def find_class(link: str, defs: List[ClassDef]) -> Optional[ClassDef]:
