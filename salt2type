@@ -41,22 +41,11 @@ from typing import List, Tuple, Optional, TextIO
 
 
 @dataclass
-class NamedDef:
-    """Any named item"""
+class PropDef:
+    """The definition of a property"""
 
     name: str
-    """
-    The name of the property/method.
-    The name will be parameterized if it is generic.
-    The name will be empty string if it is a constructor method.
-    The name will be prefixed by "operator " if it is an implicit method.
-    The name will be "this[...]" if it is an indexer method.
-    """
-
-
-@dataclass
-class PropDef(NamedDef):
-    """The definition of a property"""
+    """ the name of the property.  the name will be parameterized if it is generic. """
 
     def_val: Optional[str]
     """ The default value of the property (if known/applicable) """
@@ -69,8 +58,16 @@ class PropDef(NamedDef):
 
 
 @dataclass
-class MethodDef(NamedDef):
+class MethodDef:
     """The definition of a class method"""
+
+    name: str
+    """
+    the name of the method (empty string if it is the constructor).
+    the name will be parameterized if it is generic.
+    the name will be prefixed by "operator " if it is implicit.
+    the name will be "this[...]" if it is an indexer.
+    """
 
     params: List[PropDef]
     """ The ordered parameters of the method """
@@ -311,7 +308,7 @@ def to_text(node: Optional[ElementTree.Element]) -> str:
     """
     Extracts the text from the specified Element, discarding any tags.  Also removes leading and trailing whitespace.
     """
-    if node:
+    if node is not None:
         return "".join(node.itertext()).strip()
 
     return ""
@@ -412,7 +409,7 @@ def read_doc(filename: str) -> List[ClassDef]:
                     params = []
                     for param in member.findall("param"):
                         pname = param.find("declname").text
-                        ptype_node = member.find("type")
+                        ptype_node = param.find("type")
                         for ref in ptype_node.findall("ref"):
                             links.append(ref.get("refid"))
                         ptyp = to_type(to_text(ptype_node))
@@ -423,13 +420,33 @@ def read_doc(filename: str) -> List[ClassDef]:
     return classes.values()
 
 
-def find_by_name(items: List[NamedDef], name: str) -> Optional[NamedDef]:
+def find_prop(items: List[PropDef], name: str) -> Optional[PropDef]:
     """
-    Finds the specified item by name (if it exists in the specified list.
+    Finds the specified property by name (if it exists in the specified list.
     """
     for item in items:
-        if item.name == name:
+        if item.name.lower() == name.lower():
             return item
+
+    return None
+
+
+def find_method(items: List[MethodDef], name: str, args: int) -> Optional[MethodDef]:
+    """
+    Finds the specified method by name and number of arguments (if it exists in the specified list.
+    """
+    matches = [
+        item
+        for item in items
+        if item.name == name or item.name == "$" + name[:1].lower() + name[1:] or item.name.startswith("$" + name[:1].lower() + name[1:] + "$")
+    ]
+
+    for item in matches:
+        if len(item.params) == args:
+            return item
+
+    if matches:
+        return matches[0]
 
     return None
 
@@ -454,21 +471,21 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
             curr_class.doc_id = typ.doc_id
 
             for method in typ.methods:
-                curr_method = find_by_name(curr_class.methods, method.name)
+                curr_method = find_method(curr_class.methods, method.name, len(method.params))
 
                 if curr_method:
                     curr_method.typ = method.typ
                     curr_method.desc = method.desc
 
                     for param in method.params:
-                        curr_param = find_by_name(curr_method.params, param.name)
+                        curr_param = find_prop(curr_method.params, param.name)
 
                         if curr_param:
                             curr_param.typ = param.typ
                             curr_param.desc = param.desc
 
             for prop in typ.props:
-                curr_prop = find_by_name(curr_class.props, prop.name)
+                curr_prop = find_prop(curr_class.props, prop.name)
 
                 if curr_prop:
                     curr_prop.typ = prop.typ
@@ -591,7 +608,7 @@ def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_
 
     for item in defs:
         if item.var_id and item.var_id != ignore_var_id:
-            out_file.write("import %s from '%s/%s/%s';\n" % (item.var_id, go_up,  item.namespace.replace(".", "/"), item.name))
+            out_file.write("import %s from '%s/%s/%s';\n" % (item.var_id, go_up, item.namespace.replace(".", "/"), item.name))
 
     out_file.write("declare var ss: any;\n")
 
