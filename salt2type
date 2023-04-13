@@ -165,8 +165,8 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
         elif re.match(r"^\t(.*)\.\$ctor1\.prototype = \1\.prototype;$", line) or re.match(
             r"^\t(.*)\.\$ctor\d\.prototype = \1\.\$ctor\d\.prototype = .*\.prototype;$", line
         ):
-            # single-line constructor directives
-            globs.append(line)
+            # ignore single-line constructor directives since we're doing inheritance using typescript now
+            pass
 
         elif match := re.match(r"^\t(global|\$\.fn)\..*\{$", line):
             # multi-line global directives
@@ -222,21 +222,21 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{$", line):
             # Class multi-line definition
-            curr_class = classes[match.group(1)]
+            tmp_class = classes[match.group(1)]
 
             end_line = re_find_index(r"^\t\}", lines, i + 1)
-            add_props(curr_class, lines[i + 1 : end_line], r"\t\t")
+            add_props(tmp_class, lines[i + 1 : end_line], r"\t\t")
 
             final = lines[end_line]
             if final == "\t});":
                 pass
             elif inner := re.match(r"^\t\}, ([^, ]+)\);$", final):
-                curr_class.base_class = inner.group(1)
+                tmp_class.base_class = inner.group(1)
             elif inner := re.match(r"^\t\}, null, \[(.*)\]\);$", final):
-                curr_class.interfaces.extend(inner.group(1).split(", "))
+                tmp_class.interfaces.extend(inner.group(1).split(", "))
             elif inner := re.match(r"^\t\}, ([^, ]+), \[(.*)\]\);$", final):
-                curr_class.base_class = inner.group(1)
-                curr_class.interfaces.extend(inner.group(2).split(", "))
+                tmp_class.base_class = inner.group(1)
+                tmp_class.interfaces.extend(inner.group(2).split(", "))
             else:
                 raise Exception("Unsupported initClass multi-line ending: %s" % final)
 
@@ -244,51 +244,68 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{(.*)\}(.*)\);$", line):
             # Class single-line definition
-            curr_class = classes[match.group(1)]
-            add_props(curr_class, match.group(2).strip().split(", "), r"")
+            tmp_class = classes[match.group(1)]
+            add_props(tmp_class, match.group(2).strip().split(", "), r"")
 
             final = match.group(3)
             if final == "":
                 pass
             elif inner := re.match(r"^, ([^, ]+)$", final):
-                curr_class.base_class = inner.group(1)
+                tmp_class.base_class = inner.group(1)
             elif inner := re.match(r"^, null, \[(.*)\]$", final):
-                curr_class.interfaces.extend(inner.group(1).split(", "))
+                tmp_class.interfaces.extend(inner.group(1).split(", "))
             elif inner := re.match(r"^, ([^, ]+), \[(.*)\]$", final):
-                curr_class.base_class = inner.group(1)
-                curr_class.interfaces.extend(inner.group(2).split(", "))
+                tmp_class.base_class = inner.group(1)
+                tmp_class.interfaces.extend(inner.group(2).split(", "))
             else:
                 raise Exception("Unsupported initClass single-line ending: %s" % final)
 
         elif match := re.match(r"^\tss\.initInterface\((.*), \$asm, \{(.*)\}(.*)\);$", line):
             # Interface definition
-            curr_class = classes[match.group(1)]
-            add_props(curr_class, match.group(2).strip().split(", "), r"")
+            tmp_class = classes[match.group(1)]
+            add_props(tmp_class, match.group(2).strip().split(", "), r"")
 
             final = match.group(3)
             if final == "":
                 pass
             elif inner := re.match(r"^, \[(.*)\]$", final):
-                curr_class.interfaces.extend(inner.group(1).split(", "))
+                tmp_class.interfaces.extend(inner.group(1).split(", "))
             else:
                 raise Exception("Unsupported initInterface ending: %s" % final)
 
         elif match := re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
             # Generic definition
-            curr_class = classes[match.group(2)]
-            curr_class.is_generic = int(match.group(3))
+            tmp_class = classes[match.group(2)]
+            tmp_class.is_generic = int(match.group(3))
 
         elif match := re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\}(, true)?\);$", line):
             # Enum definition
-            curr_class = classes[match.group(1)]
-            add_props(curr_class, match.group(2).strip().split(", "), r"")
-            curr_class.is_enum = True
+            tmp_class = classes[match.group(1)]
+            add_props(tmp_class, match.group(2).strip().split(", "), r"")
+            tmp_class.is_enum = True
 
         elif line == "\t(function() {":
             # multi-line initialization functions
-            end_line = re_find_index(r"^\t\}\)\(\);", lines, i + 1)
             globs.append("")
-            globs.extend(lines[i + 1 : end_line])
+            end_line = re_find_index(r"^\t\}\)\(\);", lines, i + 1)
+            inits = lines[i + 1 : end_line]
+
+            for init in inits:
+                if match := re.match(r"^\t\t([A-Za-z0-9$_]+)\.([A-Za-z0-9$_]+) = (\[[^\[]*\]|\"[^\"]*\"|'[^']*'|\{[^\}]*\}|[0-9.-]+|null);$", init):
+                    tmp_class = classes.get(match.group(1))
+                    if tmp_class:
+                        tmp_class.props.append(PropDef(match.group(2), match.group(3)))
+                    else:
+                        globs.append(init)
+                elif match := re.match(r"^\t\t([A-Za-z0-9$_]+)\.([A-Za-z0-9$_]+) = ", init):
+                    tmp_class = classes.get(match.group(1))
+                    if tmp_class:
+                        tmp_class.props.append(PropDef(match.group(2)))
+
+                    globs.append(init)
+                else:
+                    globs.append(init)
+
             i = end_line
 
         else:
