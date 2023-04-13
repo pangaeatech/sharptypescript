@@ -1,4 +1,3 @@
-export interface Dictionary<K,V> {
-    [key: K]: V;
+export interface Dictionary<K, V> {
+  [key: K]: V;
 }
-
