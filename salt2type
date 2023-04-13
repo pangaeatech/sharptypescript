@@ -90,6 +90,9 @@ class MethodDef:
     is_static: Optional[bool] = None
     """ Whether or not this method is static (None if unknown). """
 
+    type_params: Optional[List[str]] = None
+    """ If the method is generic, then this contains the type arguments (None if unknown). """
+
 
 @dataclass
 class ClassDef:
@@ -206,14 +209,27 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             and curr_class.var_id
             and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = function\((.*)\) \{$" % re.escape(curr_class.var_id), line))
         ):
-            # Class method
-            params = []
-            for prop in match.group(2).split(", "):
-                if prop:
-                    params.append(PropDef(prop))
-
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
-            curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, lines[i + 1 : end_line])))
+            # Class method
+
+            params = []
+            type_params = None
+            if (inner := re.match(r"^\t\treturn function\((.*)\) \{$", lines[i+1])) and re.match(r"^\t\t\};$", lines[end_line - 1]):
+                # generic
+                body = lines[i + 2 : end_line - 1]
+                for prop in inner.group(1).split(", "):
+                    if prop:
+                        params.append(PropDef(prop))
+                type_params = match.group(2).split(", ")
+
+            else:
+                # non-generic
+                body = lines[i + 1 : end_line]
+                for prop in match.group(2).split(", "):
+                    if prop:
+                        params.append(PropDef(prop))
+
+            curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, None, type_params))
             i = end_line
 
         elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
@@ -320,7 +336,7 @@ def to_body(curr_class: ClassDef, lines: List[str]) -> List[str]:
     """
     Returns the specified method body formatted for inclusion inside the class.
     """
-    return [ re.sub(r"\b%s\b" % re.escape(curr_class.var_id), curr_class.name, line) for line in lines ]
+    return [ line.replace(curr_class.var_id, curr_class.name) for line in lines ]
 
 def re_find_index(pattern: str, lines: List[str], start: int) -> int:
     """
@@ -359,15 +375,28 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
     while i < len(lines):
         line = lines[i]
 
-        if match := re.match(r"^%s(.*): function\((.*)\) {$" % prefix, line):
-            # Method
-            params = []
-            for prop in match.group(2).split(", "):
-                if prop:
-                    params.append(PropDef(prop))
-
+        if match := re.match(r"^%s(.*): function\((.*)\) \{$" % prefix, line):
             end_line = re_find_index(r"^%s},?$" % prefix, lines, i + 1)
-            curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, lines[i + 1 : end_line])))
+            # Method
+
+            params = []
+            type_params = None
+            if (inner := re.match(r"^%s\treturn function\((.*)\) \{$" % prefix, lines[i+1])) and re.match(r"^%s\t\};$" % prefix, lines[end_line - 1]):
+                # generic
+                body = lines[i + 2 : end_line - 1]
+                for prop in inner.group(1).split(", "):
+                    if prop:
+                        params.append(PropDef(prop))
+                type_params = match.group(2).split(", ")
+
+            else:
+                # non-generic
+                body = lines[i + 1 : end_line]
+                for prop in match.group(2).split(", "):
+                    if prop:
+                        params.append(PropDef(prop))
+
+            curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, None, type_params))
             i = end_line
         elif match := re.match(r"^%s(.*): (.*[^,]),?$" % prefix, line):
             # Property
@@ -430,6 +459,8 @@ def read_doc(filename: str) -> List[ClassDef]:
                 prot = member.get("prot")
                 is_static = member.get("static") == "yes"
                 mname = member.find("name").text
+                if "<" in mname:
+                    mname = re.sub(r" *<.*>", "", mname)
                 desc = to_text(member.find("briefdescription"))
                 type_node = member.find("type")
                 for ref in type_node.findall("ref"):
@@ -524,7 +555,7 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
                     curr_method.typ = method.typ
                     curr_method.desc = method.desc
                     curr_method.protection = method.protection
-                    curr_method.is_static = method.is_static
+                    curr_method.is_static = curr_method.is_static or method.is_static
 
                     for param in method.params:
                         curr_param = find_prop(curr_method.params, param.name)
@@ -642,10 +673,11 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
                     fil.write("\t/** %s **/\n" % method.desc)
                 props = ", ".join(map(prop_to_string, method.params))
                 prot = method.protection if method.protection in ("public", "private", "protected") else ""
+                gen = ("<%s>" % ",".join(method.type_params)) if method.type_params else ""
                 if method.name:
-                    fil.write("\t%s %s%s(%s): %s {\n" % (prot, "static " if method.is_static else "", method.name, props, method.typ or "any"))
+                    fil.write("\t%s %s%s%s(%s): %s {\n" % (prot, "static " if method.is_static else "", method.name, gen, props, method.typ or "any"))
                 else:
-                    fil.write("\tconstructor(%s) {\n" % props)
+                    fil.write("\tconstructor%s(%s) {\n" % ( gen, props))
                 for line in method.body:
                     fil.write("\t%s\n" % line)
                 fil.write("\t}\n")
