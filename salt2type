@@ -214,7 +214,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
 
             params = []
             type_params = None
-            if (inner := re.match(r"^\t\treturn function\((.*)\) \{$", lines[i+1])) and re.match(r"^\t\t\};$", lines[end_line - 1]):
+            if (inner := re.match(r"^\t\treturn function\((.*)\) \{$", lines[i + 1])) and re.match(r"^\t\t\};$", lines[end_line - 1]):
                 # generic
                 body = lines[i + 2 : end_line - 1]
                 for prop in inner.group(1).split(", "):
@@ -336,7 +336,8 @@ def to_body(curr_class: ClassDef, lines: List[str]) -> List[str]:
     """
     Returns the specified method body formatted for inclusion inside the class.
     """
-    return [ line.replace(curr_class.var_id, curr_class.name) for line in lines ]
+    return [line.replace(curr_class.var_id, curr_class.name) for line in lines]
+
 
 def re_find_index(pattern: str, lines: List[str], start: int) -> int:
     """
@@ -381,7 +382,9 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
 
             params = []
             type_params = None
-            if (inner := re.match(r"^%s\treturn function\((.*)\) \{$" % prefix, lines[i+1])) and re.match(r"^%s\t\};$" % prefix, lines[end_line - 1]):
+            if (inner := re.match(r"^%s\treturn function\((.*)\) \{$" % prefix, lines[i + 1])) and re.match(
+                r"^%s\t\};$" % prefix, lines[end_line - 1]
+            ):
                 # generic
                 body = lines[i + 2 : end_line - 1]
                 for prop in inner.group(1).split(", "):
@@ -677,7 +680,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
                 if method.name:
                     fil.write("\t%s %s%s%s(%s): %s {\n" % (prot, "static " if method.is_static else "", method.name, gen, props, method.typ or "any"))
                 else:
-                    fil.write("\tconstructor%s(%s) {\n" % ( gen, props))
+                    fil.write("\tconstructor%s(%s) {\n" % (gen, props))
                 for line in method.body:
                     fil.write("\t%s\n" % line)
                 fil.write("\t}\n")
