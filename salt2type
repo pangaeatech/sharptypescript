@@ -90,6 +90,9 @@ class MethodDef:
     is_static: Optional[bool] = None
     """ Whether or not this method is static (None if unknown). """
 
+    type_params: Optional[List[str]] = None
+    """ If the method is generic, then this contains the type arguments (None if unknown). """
+
 
 @dataclass
 class ClassDef:
@@ -165,8 +168,8 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
         elif re.match(r"^\t(.*)\.\$ctor1\.prototype = \1\.prototype;$", line) or re.match(
             r"^\t(.*)\.\$ctor\d\.prototype = \1\.\$ctor\d\.prototype = .*\.prototype;$", line
         ):
-            # single-line constructor directives
-            globs.append(line)
+            # ignore single-line constructor directives since we're doing inheritance using typescript now
+            pass
 
         elif match := re.match(r"^\t(global|\$\.fn)\..*\{$", line):
             # multi-line global directives
@@ -198,7 +201,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
                     params.append(PropDef(prop))
 
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
-            curr_class.methods.append(MethodDef("", params, None, lines[i + 1 : end_line]))
+            curr_class.methods.append(MethodDef("", params, None, to_body(curr_class, lines[i + 1 : end_line])))
             i = end_line
 
         elif (
@@ -206,14 +209,27 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             and curr_class.var_id
             and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = function\((.*)\) \{$" % re.escape(curr_class.var_id), line))
         ):
-            # Class method
-            params = []
-            for prop in match.group(2).split(", "):
-                if prop:
-                    params.append(PropDef(prop))
-
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
-            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line]))
+            # Class method
+
+            params = []
+            type_params = None
+            if (inner := re.match(r"^\t\treturn function\((.*)\) \{$", lines[i + 1])) and re.match(r"^\t\t\};$", lines[end_line - 1]):
+                # generic
+                body = lines[i + 2 : end_line - 1]
+                for prop in inner.group(1).split(", "):
+                    if prop:
+                        params.append(PropDef(prop))
+                type_params = match.group(2).split(", ")
+
+            else:
+                # non-generic
+                body = lines[i + 1 : end_line]
+                for prop in match.group(2).split(", "):
+                    if prop:
+                        params.append(PropDef(prop))
+
+            curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, None, type_params))
             i = end_line
 
         elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
@@ -222,21 +238,21 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{$", line):
             # Class multi-line definition
-            curr_class = classes[match.group(1)]
+            tmp_class = classes[match.group(1)]
 
             end_line = re_find_index(r"^\t\}", lines, i + 1)
-            add_props(curr_class, lines[i + 1 : end_line], r"\t\t")
+            add_props(tmp_class, lines[i + 1 : end_line], r"\t\t")
 
             final = lines[end_line]
             if final == "\t});":
                 pass
             elif inner := re.match(r"^\t\}, ([^, ]+)\);$", final):
-                curr_class.base_class = inner.group(1)
+                tmp_class.base_class = inner.group(1)
             elif inner := re.match(r"^\t\}, null, \[(.*)\]\);$", final):
-                curr_class.interfaces.extend(inner.group(1).split(", "))
+                tmp_class.interfaces.extend(inner.group(1).split(", "))
             elif inner := re.match(r"^\t\}, ([^, ]+), \[(.*)\]\);$", final):
-                curr_class.base_class = inner.group(1)
-                curr_class.interfaces.extend(inner.group(2).split(", "))
+                tmp_class.base_class = inner.group(1)
+                tmp_class.interfaces.extend(inner.group(2).split(", "))
             else:
                 raise Exception("Unsupported initClass multi-line ending: %s" % final)
 
@@ -244,51 +260,68 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{(.*)\}(.*)\);$", line):
             # Class single-line definition
-            curr_class = classes[match.group(1)]
-            add_props(curr_class, match.group(2).strip().split(", "), r"")
+            tmp_class = classes[match.group(1)]
+            add_props(tmp_class, match.group(2).strip().split(", "), r"")
 
             final = match.group(3)
             if final == "":
                 pass
             elif inner := re.match(r"^, ([^, ]+)$", final):
-                curr_class.base_class = inner.group(1)
+                tmp_class.base_class = inner.group(1)
             elif inner := re.match(r"^, null, \[(.*)\]$", final):
-                curr_class.interfaces.extend(inner.group(1).split(", "))
+                tmp_class.interfaces.extend(inner.group(1).split(", "))
             elif inner := re.match(r"^, ([^, ]+), \[(.*)\]$", final):
-                curr_class.base_class = inner.group(1)
-                curr_class.interfaces.extend(inner.group(2).split(", "))
+                tmp_class.base_class = inner.group(1)
+                tmp_class.interfaces.extend(inner.group(2).split(", "))
             else:
                 raise Exception("Unsupported initClass single-line ending: %s" % final)
 
         elif match := re.match(r"^\tss\.initInterface\((.*), \$asm, \{(.*)\}(.*)\);$", line):
             # Interface definition
-            curr_class = classes[match.group(1)]
-            add_props(curr_class, match.group(2).strip().split(", "), r"")
+            tmp_class = classes[match.group(1)]
+            add_props(tmp_class, match.group(2).strip().split(", "), r"")
 
             final = match.group(3)
             if final == "":
                 pass
             elif inner := re.match(r"^, \[(.*)\]$", final):
-                curr_class.interfaces.extend(inner.group(1).split(", "))
+                tmp_class.interfaces.extend(inner.group(1).split(", "))
             else:
                 raise Exception("Unsupported initInterface ending: %s" % final)
 
         elif match := re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
             # Generic definition
-            curr_class = classes[match.group(2)]
-            curr_class.is_generic = int(match.group(3))
+            tmp_class = classes[match.group(2)]
+            tmp_class.is_generic = int(match.group(3))
 
         elif match := re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\}(, true)?\);$", line):
             # Enum definition
-            curr_class = classes[match.group(1)]
-            add_props(curr_class, match.group(2).strip().split(", "), r"")
-            curr_class.is_enum = True
+            tmp_class = classes[match.group(1)]
+            add_props(tmp_class, match.group(2).strip().split(", "), r"")
+            tmp_class.is_enum = True
 
         elif line == "\t(function() {":
             # multi-line initialization functions
-            end_line = re_find_index(r"^\t\}\)\(\);", lines, i + 1)
             globs.append("")
-            globs.extend(lines[i + 1 : end_line])
+            end_line = re_find_index(r"^\t\}\)\(\);", lines, i + 1)
+            inits = lines[i + 1 : end_line]
+
+            for init in inits:
+                if match := re.match(r"^\t\t([A-Za-z0-9$_]+)\.([A-Za-z0-9$_]+) = (\[[^\[]*\]|\"[^\"]*\"|'[^']*'|\{[^\}]*\}|[0-9.-]+|null);$", init):
+                    tmp_class = classes.get(match.group(1))
+                    if tmp_class:
+                        tmp_class.props.append(PropDef(match.group(2), match.group(3)))
+                    else:
+                        globs.append(init)
+                elif match := re.match(r"^\t\t([A-Za-z0-9$_]+)\.([A-Za-z0-9$_]+) = ", init):
+                    tmp_class = classes.get(match.group(1))
+                    if tmp_class:
+                        tmp_class.props.append(PropDef(match.group(2)))
+
+                    globs.append(init)
+                else:
+                    globs.append(init)
+
             i = end_line
 
         else:
@@ -297,6 +330,13 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
         i += 1
 
     return asm_name, classes.values(), globs
+
+
+def to_body(curr_class: ClassDef, lines: List[str]) -> List[str]:
+    """
+    Returns the specified method body formatted for inclusion inside the class.
+    """
+    return [line.replace(curr_class.var_id, curr_class.name) for line in lines]
 
 
 def re_find_index(pattern: str, lines: List[str], start: int) -> int:
@@ -336,15 +376,30 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
     while i < len(lines):
         line = lines[i]
 
-        if match := re.match(r"^%s(.*): function\((.*)\) {$" % prefix, line):
-            # Method
-            params = []
-            for prop in match.group(2).split(", "):
-                if prop:
-                    params.append(PropDef(prop))
-
+        if match := re.match(r"^%s(.*): function\((.*)\) \{$" % prefix, line):
             end_line = re_find_index(r"^%s},?$" % prefix, lines, i + 1)
-            curr_class.methods.append(MethodDef(match.group(1), params, None, lines[i + 1 : end_line]))
+            # Method
+
+            params = []
+            type_params = None
+            if (inner := re.match(r"^%s\treturn function\((.*)\) \{$" % prefix, lines[i + 1])) and re.match(
+                r"^%s\t\};$" % prefix, lines[end_line - 1]
+            ):
+                # generic
+                body = lines[i + 2 : end_line - 1]
+                for prop in inner.group(1).split(", "):
+                    if prop:
+                        params.append(PropDef(prop))
+                type_params = match.group(2).split(", ")
+
+            else:
+                # non-generic
+                body = lines[i + 1 : end_line]
+                for prop in match.group(2).split(", "):
+                    if prop:
+                        params.append(PropDef(prop))
+
+            curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, None, type_params))
             i = end_line
         elif match := re.match(r"^%s(.*): (.*[^,]),?$" % prefix, line):
             # Property
@@ -366,6 +421,7 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
     raw_type = re.sub(r"\bList\b", "Array", raw_type)
     raw_type = re.sub(r"\bJsDictionary\b", "Dictionary", raw_type)
+    raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
     raw_type = re.sub(r"\bDelegate\b", "Action", raw_type)
 
@@ -406,6 +462,8 @@ def read_doc(filename: str) -> List[ClassDef]:
                 prot = member.get("prot")
                 is_static = member.get("static") == "yes"
                 mname = member.find("name").text
+                if "<" in mname:
+                    mname = re.sub(r" *<.*>", "", mname)
                 desc = to_text(member.find("briefdescription"))
                 type_node = member.find("type")
                 for ref in type_node.findall("ref"):
@@ -500,7 +558,7 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
                     curr_method.typ = method.typ
                     curr_method.desc = method.desc
                     curr_method.protection = method.protection
-                    curr_method.is_static = method.is_static
+                    curr_method.is_static = curr_method.is_static or method.is_static
 
                     for param in method.params:
                         curr_param = find_prop(curr_method.params, param.name)
@@ -618,10 +676,11 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
                     fil.write("\t/** %s **/\n" % method.desc)
                 props = ", ".join(map(prop_to_string, method.params))
                 prot = method.protection if method.protection in ("public", "private", "protected") else ""
+                gen = ("<%s>" % ",".join(method.type_params)) if method.type_params else ""
                 if method.name:
-                    fil.write("\t%s %s%s(%s): %s {\n" % (prot, "static " if method.is_static else "", method.name, props, method.typ or "any"))
+                    fil.write("\t%s %s%s%s(%s): %s {\n" % (prot, "static " if method.is_static else "", method.name, gen, props, method.typ or "any"))
                 else:
-                    fil.write("\tconstructor(%s) {\n" % props)
+                    fil.write("\tconstructor%s(%s) {\n" % (gen, props))
                 for line in method.body:
                     fil.write("\t%s\n" % line)
                 fil.write("\t}\n")
@@ -639,6 +698,7 @@ def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_
         if item.var_id and item.var_id != ignore_var_id:
             out_file.write("import %s from '%s/%s/%s';\n" % (item.var_id, go_up, item.namespace.replace(".", "/"), item.name))
 
+    out_file.write("import { Dictionary } from '%s/types';\n" % go_up)
     out_file.write("declare var ss: any;\n")
 
 
