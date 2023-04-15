@@ -48,8 +48,8 @@ However, if you need/wish to write your client-side code in TypeScript and your 
    - `OUTDIR` = The folder to populate with the new typescript project
    - `NSNAME` = The namespace to export for external use
    - `BLFILE` = An optional blacklist file of those classes, methods/properties to ignore
-        - Classes are specified with their namespace (e.g. `package.subpackage.ClassName`)
-        - Methods/Properties are specified with thir classes (e.g. `package.subpackage.ClassName:MethodName`)
+     - Classes are specified with their namespace (e.g. `package.subpackage.ClassName`)
+     - Methods/Properties are specified with thir classes (e.g. `package.subpackage.ClassName:MethodName`)
 4. Post-Migration Validation and Cleanup
    - `cd OUTDIR`
    - `npm install`

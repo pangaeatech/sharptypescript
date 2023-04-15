@@ -459,8 +459,9 @@ def to_type(raw_type: str) -> str:
 
     raw_type = re.sub(r"\bbool\b", "boolean", raw_type)
     raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
-    raw_type = re.sub(r"\bList|ss\.IEnumerable|ss\.ICollection\b", "Array", raw_type)
-    raw_type = re.sub(r"\bss\.JsDate\b", "Date", raw_type)
+    raw_type = re.sub(r"\b(List|ss\.IEnumerable|ss\.ICollection)\b", "Array", raw_type)
+    raw_type = re.sub(r"\b(ss\.JsDate|JsDate)\b", "Date", raw_type)
+    raw_type = re.sub(r"\bObject\b", "object", raw_type)
     raw_type = re.sub(r"\bJsDictionary\b", "Dictionary", raw_type)
     raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
