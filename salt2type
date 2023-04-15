@@ -131,6 +131,9 @@ class ClassDef:
     is_enum: Optional[bool] = None
     """ Whether or not this class should be treated as an enum (None if unknown). """
 
+    is_abstract: Optional[bool] = None
+    """ Whether or not this class is abstract (None if unknown). """
+
 
 ######################
 ### Helper Methods ###
@@ -456,7 +459,8 @@ def to_type(raw_type: str) -> str:
 
     raw_type = re.sub(r"\bbool\b", "boolean", raw_type)
     raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
-    raw_type = re.sub(r"\bList\b", "Array", raw_type)
+    raw_type = re.sub(r"\bList|ss\.IEnumerable|ss\.ICollection\b", "Array", raw_type)
+    raw_type = re.sub(r"\bss\.JsDate\b", "Date", raw_type)
     raw_type = re.sub(r"\bJsDictionary\b", "Dictionary", raw_type)
     raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
@@ -488,11 +492,12 @@ def read_doc(filename: str) -> List[ClassDef]:
             key = compound.find("compoundname").text.replace("::", ".")
             [namespace, name] = key.rsplit(".", 1)
             doc_id = compound.get("id")
+            is_abstract = compound.get("abstract") == "yes"
             methods = []
             props = []
             links = []
 
-            classes[key] = ClassDef(namespace, name, doc_id, methods, props, links, None, None, [], 0)
+            classes[key] = ClassDef(namespace, name, doc_id, methods, props, links, None, None, [], 0, None, is_abstract)
 
             for member in compound.findall("./sectiondef/memberdef"):
                 kind = member.get("kind")
@@ -587,6 +592,7 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
 
         if curr_class:
             curr_class.doc_id = typ.doc_id
+            curr_class.is_abstract = typ.is_abstract
 
             for method in typ.methods:
                 curr_method = find_method(curr_class.methods, method.name, len(method.params))
@@ -699,7 +705,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
 
             interfaces = "implements %s " % ", ".join(item.interfaces) if item.interfaces else ""
             baseclass = "extends %s " % item.base_class if item.base_class else ""
-            fil.write("export default class %s %s%s{\n" % (item.name, baseclass, interfaces))
+            fil.write("export default %sclass %s %s%s{\n" % ("abstract " if item.is_abstract else "", item.name, baseclass, interfaces))
 
             for prop in item.props:
                 fil.write("\n")

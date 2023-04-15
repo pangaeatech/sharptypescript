@@ -40,6 +40,11 @@ export function referenceEquals(a: unknown, b: unknown): boolean
     return a === b;
 }
 
+export function unbox<T>(a: T): T 
+{
+    return a;
+}
+
 /** Returns the current UTC date. */
 export function utcNow(): Date
 {
@@ -94,35 +99,89 @@ export interface IDisposable
     dispose: () => void;
 }
 
+export class Nullable$1
+{
+    static gt(a?: Date | number, b?: Date | number): boolean
+    {
+        // TODO
+    }
+
+    static ge(a?: Date | number, b?: Date | number): boolean
+    {
+        // TODO
+    }
+
+    static lt(a?: Date | number, b?: Date | number): boolean
+    {
+        // TODO
+    }
+
+    static le(a?: Date | number, b?: Date | number): boolean
+    {
+        // TODO
+    }
+
+    static add(a?: number, b?: number): number | undefined
+    {
+        // TODO
+    }
+
+    static sub(a?: number, b?: number): number | undefined
+    {
+        // TODO
+    }
+}
+
+export const NumberFormatInfo = { invariantInfo: { currencySymbol: "$", percentSymbol: "%" } };
+
+export function arrayAddRange<T>(a: T[], b: T[]): void
+{
+    a.push(...b);
+}
+
+export function arrayExtract<T>(a: T[], i: number, j: number): T[]
+{
+    return a.slice(i, j);
+}
+
+export function arrayFromEnumerable<T>(a: T[]): T[]
+{
+    return a;
+}
+
+export function clear<T>(a: T[]): void
+{
+    a.length = 0;
+}
+
+export function clearKeys(a: unknown): void
+{
+    Object.keys(obj).forEach(key => { delete obj[key]; });
+}
+
+export function compare(a: number, b: number): number
+{
+    return a - b;
+}
+
+export function count<T>(a: T[]): number
+{
+    return a.length;
+}
+
 /*
-Dictionary$2
-Enum
 EventArgs
 Guid
-ICollection
-IDisposable
-IEnumerable
 Int32
 InvalidOperationException
 IteratorBlockEnumerable
 IteratorBlockEnumerator
-JsDate
-Nullable$1
-NumberFormatInfo
 ObjectEnumerator
 Stopwatch
 StringBuilder
 TimeSpan
-arrayAddRange
-arrayExtract
-arrayFromEnumerable
-clear
-clearKeys
-coalesce
-compare
 compareStrings
 contains
-count
 createInstance
 delegateCombine
 delegateRemove
@@ -157,5 +216,4 @@ setMetadata
 shallowCopy
 staticEquals
 thisFix
-unbox
 */
