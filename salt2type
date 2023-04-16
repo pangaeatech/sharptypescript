@@ -59,6 +59,9 @@ class PropDef:
     is_rest: Optional[bool] = None
     """ Whether or not this is a rest parameter (None if unknown). """
 
+    is_static: Optional[bool] = None
+    """ Whether or not this method is static (None if unknown). """
+
 
 @dataclass
 class MethodDef:
@@ -223,7 +226,7 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = function\((.*)\) \{$" % re.escape(curr_class.var_id), line))
         ):
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
-            # Class method
+            # static class method
 
             params = []
             type_params = None
@@ -243,14 +246,14 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
                         params.append(PropDef(prop))
 
             if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in blacklist:
-                curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, None, type_params))
+                curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, True, type_params))
 
             i = end_line
 
         elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
-            # Class property
+            # static class property
             if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in blacklist:
-                curr_class.props.append(PropDef(match.group(1), match.group(2)))
+                curr_class.props.append(PropDef(match.group(1), match.group(2), None, None, None, True))
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{$", line):
             # Class multi-line definition
@@ -258,6 +261,7 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             end_line = re_find_index(r"^\t\}", lines, i + 1)
 
             if tmp_class:
+                tmp_class.props.append(PropDef("__class", "true", None, None, None, True))
                 add_props(tmp_class, lines[i + 1 : end_line], r"\t\t", blacklist)
 
                 final = lines[end_line]
@@ -280,6 +284,7 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             tmp_class = classes.get(match.group(1))
 
             if tmp_class:
+                tmp_class.props.append(PropDef("__class", "true", None, None, None, True))
                 add_props(tmp_class, match.group(2).strip().split(", "), r"", blacklist)
 
                 final = match.group(3)
@@ -300,6 +305,7 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             tmp_class = classes.get(match.group(1))
 
             if tmp_class:
+                tmp_class.props.append(PropDef("__interface", "true", None, None, None, True))
                 add_props(tmp_class, match.group(2).strip().split(", "), r"", blacklist)
 
                 final = match.group(3)
@@ -314,12 +320,18 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             # Generic definition
             tmp_class = classes.get(match.group(2))
             if tmp_class:
+                if match.group(1) == "Class":
+                    tmp_class.props.append(PropDef("__class", "true", None, None, None, True))
+                else:
+                    tmp_class.props.append(PropDef("__interface", "true", None, None, None, True))
+
                 tmp_class.is_generic = int(match.group(3))
 
         elif match := re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\}(, true)?\);$", line):
             # Enum definition
             tmp_class = classes.get(match.group(1))
             if tmp_class:
+                tmp_class.props.append(PropDef("__enum", "true", None, None, None, True))
                 add_props(tmp_class, match.group(2).strip().split(", "), r"", blacklist)
                 tmp_class.is_enum = True
 
@@ -362,11 +374,6 @@ def clean_line(line: str) -> str:
     # Handle generic method calls
     line = re.sub(r"\b([A-Za-z0-9$_]+)\(([^\(\)]+)\)\.call\(", lambda m: f"{m.group(1)}<{to_type(m.group(2))}>(", line)
 
-    # Replace trivial ss.* methods
-    line = re.sub(r"\bss\.getDefaultValue\(([^\(\)]+)\)", "undefined", line)
-    line = re.sub(r"\bss\.createInstance\(([^\(\)]+)\)", "{}", line)
-    line = re.sub(r"\bss\.cast\(ss\.cast\(([^,\(\)]+), [^,\(\)]*\), ([^,\(\)]*)\)", r"(\1 as unknown as \2)", line)
-    line = re.sub(r"\bss\.cast\(([^,\(\)]+), ([^,\(\)]+)\)", r"(\1 as unknown as \2)", line)
     return line
 
 
@@ -462,7 +469,7 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"\b(List|ss\.IEnumerable|ss\.ICollection)\b", "Array", raw_type)
     raw_type = re.sub(r"\b(ss\.JsDate|JsDate)\b", "Date", raw_type)
     raw_type = re.sub(r"\bObject\b", "object", raw_type)
-    raw_type = re.sub(r"\bJsDictionary\b", "Dictionary", raw_type)
+    raw_type = re.sub(r"\bJsDictionary\b", "ss.Dictionary", raw_type)
     raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
     raw_type = re.sub(r"\bDelegate\b", "Action", raw_type)
@@ -671,7 +678,8 @@ def prop_to_string(prop: PropDef) -> str:
     """
     defval = " = %s" % prop.def_val if prop.def_val else ""
     typstr = ": %s" % (prop.typ or "any") if not defval or prop.typ else ""
-    return "%s%s%s%s" % ("..." if prop.is_rest else "", prop.name, typstr, defval)
+    prefix = "..." if prop.is_rest else ("static " if prop.is_static else "")
+    return "%s%s%s%s" % (prefix, prop.name, typstr, defval)
 
 
 def find_class(link: str, defs: List[ClassDef]) -> Optional[ClassDef]:
@@ -742,11 +750,10 @@ def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_
         if item.var_id and item.var_id != ignore_var_id:
             out_file.write("import %s from '%s/%s/%s';\n" % (item.var_id, go_up, item.namespace.replace(".", "/"), item.name))
 
-    out_file.write("import { Dictionary } from '%s/types';\n" % go_up)
     out_file.write("import * as ss from '%s/ss';\n" % go_up)
 
 
-def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
+def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], asm_name: str) -> None:
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
@@ -760,6 +767,11 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
         fil.write("\n")
         for glob in globs:
             fil.write("%s\n" % glob)
+
+        fil.write("\n")
+        for item in defs:
+            if item.var_id:
+                fil.write("ss.registerClass('%s', '%s', '%s', %s);\n" % (asm_name, item.namespace, item.name, item.var_id))
 
 
 ###################
@@ -778,4 +790,4 @@ if __name__ == "__main__":
 
     copy_tpl(OUT_DIR, ASM_NAME, NS_NAME)
     gen_ts(OUT_DIR, CLASSES)
-    gen_index(OUT_DIR, CLASSES, GLOBALS)
+    gen_index(OUT_DIR, CLASSES, GLOBALS, ASM_NAME)

@@ -68,5 +68,4 @@ However, if you need/wish to write your client-side code in TypeScript and your 
 
 ### Known Limitations
 
-This code only supports the subset of Script# that we needed to migrate our own
-legacy codebases. It does not support all possible Script# codebases.
+This code only supports the subset of Script# that we needed to migrate our own legacy codebases. It does not support all possible Script# codebases. If the implementation of `ss.ts` does not include everything you need, you can pull in additional functionality from https://github.com/Saltarelle/SaltarelleCompiler/tree/develop/Runtime/CoreLib.Script/
