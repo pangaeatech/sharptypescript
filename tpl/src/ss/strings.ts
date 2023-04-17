@@ -1,5 +1,7 @@
+import { isValue } from "./index";
+
 /** Returns whether or not the specified string is null or empty. */
-export function isNullOrEmptyString(val: str): boolean {
+export function isNullOrEmptyString(val: string): boolean {
     return !val || !val.length;
 }
 
@@ -22,8 +24,8 @@ export function regexpEscape(s: string): string {
 }
 
 export function netSplit(s: string, strings: string[], limit: number, options?: number): string[] {
-    const re = new RegExp(strings.map(_egexpEscape).join("|"), "g");
-    const res = [];
+    const re = new RegExp(strings.map(regexpEscape).join("|"), "g");
+    const res: string[] = [];
     var m;
 
     for (let i = 0; ; i = re.lastIndex) {
@@ -124,19 +126,17 @@ export function htmlEncode(s: string): string {
         .replace(/>/g, "&gt;");
 }
 
-export function padLeftString(s: string, totalWidth: number, ch: string): string {
+export function padLeftString(s: string, totalWidth: number, ch?: number): string {
     if (s.length < totalWidth) {
-        ch = String.fromCharCode(ch || 0x20);
-        return stringFromChar(ch, totalWidth - s.length) + s;
+        return stringFromChar(String.fromCharCode(ch || 0x20), totalWidth - s.length) + s;
     }
 
     return s;
 }
 
-export function padRightString(s: string, totalWidth: number, ch: string): string {
+export function padRightString(s: string, totalWidth: number, ch?: number): string {
     if (s.length < totalWidth) {
-        ch = String.fromCharCode(ch || 0x20);
-        return s + stringFromChar(ch, totalWidth - s.length);
+        return s + stringFromChar(String.fromCharCode(ch || 0x20), totalWidth - s.length);
     }
 
     return s;

@@ -1,4 +1,9 @@
-import Dictionary from "./Dictionary";
+import { isValue } from "./index";
+
+/** A dictionary with string keys. */
+export interface Dictionary<T> {
+    [key: string]: T;
+}
 
 /** An interface containing the dipose method. */
 export interface IDisposable {
@@ -42,10 +47,10 @@ interface ObjectEntry<T> {
 export class ObjectEnumerator<T> implements IDisposable {
     private _keys: string[];
     private _index: number;
-    private _object: Dictionary<string, T>;
+    private _object: Dictionary<T>;
 
-    constructor(o: Dictionary<string, T>) {
-        this._keys = o.get_keys();
+    constructor(o: Dictionary<T>) {
+        this._keys = Object.keys(o);
         this._index = -1;
         this._object = o;
     }
@@ -72,13 +77,13 @@ export class ObjectEnumerator<T> implements IDisposable {
 }
 
 export class IteratorBlockEnumerable<T> {
-    private _enumerator: () => IteratorBlockEnumerator;
+    private _enumerator: () => IteratorBlockEnumerator<T>;
 
-    constructor(enumerator: () => IteratorBlockEnumerator, $this: unknown) {
+    constructor(enumerator: () => IteratorBlockEnumerator<T>, $this: unknown) {
         this._enumerator = enumerator;
     }
 
-    getEnumerator(): IteratorBlockEnumerator {
+    getEnumerator(): IteratorBlockEnumerator<T> {
         return this._enumerator();
     }
 }
@@ -86,13 +91,13 @@ export class IteratorBlockEnumerable<T> {
 export class IteratorBlockEnumerator<T> implements IDisposable {
     private _moveNext: ($this: unknown) => void;
     private _getCurrent: ($this: unknown) => T;
-    private _dispose?: () => void;
+    private _dispose?: ($this?: unknown) => void;
     private _this: unknown;
 
     constructor(
         moveNext: ($this: unknown) => void,
         getCurrent: ($this: unknown) => T,
-        dispose: (() => void) | undefined,
+        dispose: (($this?: unknown) => void) | undefined,
         $this: unknown
     ) {
         this._moveNext = moveNext;
@@ -134,7 +139,7 @@ export function insert<T>(arr: T[], index: number, item: T): void {
 
 /** Appends the specified item to an array. */
 export function add<T>(arr: T[], item: T): void {
-    arry.push(item);
+    arr.push(item);
 }
 
 export function remove<T>(arr: T[], item: T): boolean {
@@ -189,26 +194,26 @@ export function getEnumerator<T>(arr: T[]): ArrayEnumerator<T> {
 }
 
 /** Returns the number of keys in the specified dictionary. */
-export function getKeyCount(item: Dictionary): number {
-    return item.get_count();
+export function getKeyCount<T>(item: Dictionary<T>): number {
+    return Object.keys(item).length;
 }
 
 /** Remove all items from an dictionary. */
-export function clearKeys(d: Dictionary): void {
-    for (n in d) {
+export function clearKeys<T>(d: Dictionary<T>): void {
+    for (const n in d) {
         if (d.hasOwnProperty(n)) {
             delete d[n];
         }
     }
 }
 
-export function keyExists(d: Dictionary, k: string): boolean {
-    return d[key] !== undefined;
+export function keyExists<T>(d: Dictionary<T>, k: string): boolean {
+    return d[k] !== undefined;
 }
 
 /** Generate a dictionary from an array. */
-export function mkdict(args: string[]): Dictionary {
-    const r: Dictionary = {};
+export function mkdict(args: string[]): Dictionary<string> {
+    const r: Dictionary<string> = {};
     for (var i = 0; i < args.length; i += 2) {
         r[args[i]] = args[i + 1];
     }

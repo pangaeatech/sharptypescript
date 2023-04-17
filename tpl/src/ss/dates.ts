@@ -1,4 +1,5 @@
 import StringBuilder from "./StringBuilder";
+import { padLeftString, isNullOrEmptyString } from "./strings";
 
 /** Returns the current UTC date. */
 export function utcNow(): Date {
@@ -16,19 +17,19 @@ export function utcNow(): Date {
 
 /** Formats the specified date using the format string. */
 export function formatDate(d: Date, format: string): string {
-    if (isNullOrUndefined(format) || format.length == 0 || format == "i") {
-        return date.toString();
+    if (isNullOrEmptyString(format) || format == "i") {
+        return d.toString();
     }
 
     if (format == "id") {
-        return date.toDateString();
+        return d.toDateString();
     }
 
     if (format == "it") {
-        return date.toTimeString();
+        return d.toTimeString();
     }
 
-    return netFormatDate(date, format);
+    return netFormatDate(d, format);
 }
 
 const DateFormatInfo = {
@@ -72,6 +73,8 @@ const DateFormatInfo = {
     shortMonthNames: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", ""]
 };
 
+const _formatRE = /'.*?[^\\]'|dddd|ddd|dd|d|MMMM|MMM|MM|M|yyyy|yy|y|hh|h|HH|H|mm|m|ss|s|tt|t|fff|ff|f|zzz|zz|z/g;
+
 export function netFormatDate(dt: Date, format: string): string {
     if (format.length == 1) {
         switch (format) {
@@ -105,7 +108,6 @@ export function netFormatDate(dt: Date, format: string): string {
 
             case "R":
             case "r":
-                DateFormatInfo = ss_CultureInfo.InvariantCulture.dateTimeFormat;
                 format = DateFormatInfo.gmtDateTimePattern;
                 break;
             case "u":
@@ -134,17 +136,13 @@ export function netFormatDate(dt: Date, format: string): string {
         format = format.substr(1);
     }
 
-    if (!Date._formatRE) {
-        Date._formatRE = /'.*?[^\\]'|dddd|ddd|dd|d|MMMM|MMM|MM|M|yyyy|yy|y|hh|h|HH|H|mm|m|ss|s|tt|t|fff|ff|f|zzz|zz|z/g;
-    }
-
-    var re = Date._formatRE;
     var sb = new StringBuilder();
 
-    re.lastIndex = 0;
-    while (true) {  // eslint-disable-line no-constant-condition
-        var index = re.lastIndex;
-        var match = re.exec(format);
+    _formatRE.lastIndex = 0;
+    /* eslint-disable-next-line no-constant-condition */
+    while (true) {
+        var index = _formatRE.lastIndex;
+        var match = _formatRE.exec(format);
 
         sb.append(format.slice(index, match ? match.index : format.length));
         if (!match) {
@@ -152,7 +150,7 @@ export function netFormatDate(dt: Date, format: string): string {
         }
 
         var fs = match[0];
-        var part = fs;
+        var part: number | string = fs;
         switch (fs) {
             case "dddd":
                 part = DateFormatInfo.dayNames[dt.getDay()];
@@ -237,11 +235,11 @@ export function netFormatDate(dt: Date, format: string): string {
             case "zz":
             case "zzz":
                 part = dt.getTimezoneOffset() / 60;
-                part = (part >= 0 ? "-" : "+") + Math.floor(padLeftString(Math.abs(part)).toString(), 2, 0x30);
+                part = (part >= 0 ? "-" : "+") + padLeftString(Math.floor(Math.abs(part)).toString(), 2, 0x30);
                 if (fs == "zzz") {
                     part +=
                         DateFormatInfo.timeSeparator +
-                        Math.abs(padLeftString(dt.getTimezoneOffset() % 60).toString(), 2, 0x30);
+                        padLeftString(Math.abs(dt.getTimezoneOffset() % 60).toString(), 2, 0x30);
                 }
                 break;
             default:

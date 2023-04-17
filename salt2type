@@ -458,6 +458,7 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"\bbool\b", "boolean", raw_type)
     raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
     raw_type = re.sub(r"\b(ss\.)?(List|IEnumerable|ICollection)\b", "Array", raw_type)
+    raw_type = re.sub(r"\b(ss\.)?(Dictionary|JsDictionary)\b", "ss.Dictionary<unknown>", raw_type)
     raw_type = re.sub(r"\b(ss\.)?JsDate\b", "Date", raw_type)
     raw_type = re.sub(r"\bObject\b", "object", raw_type)
     raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)

@@ -1,8 +1,7 @@
 import TimeSpan from "./TimeSpan";
 
 export default class Stopwatch {
-    private frequency = 1e3;
-    private isHighResolution = false;
+    private static frequency = 1e3;
     private _stopTime = 0;
     private _startTime = 0;
     private _isRunning = false;
@@ -19,15 +18,15 @@ export default class Stopwatch {
 
     reset(): void {
         this._stopTime = this._startTime = this.getTimestamp();
-        this.isRunning = false;
+        this._isRunning = false;
     }
 
     ticks(): number {
-        return (this.isRunning ? this.getTimestamp() : this._stopTime) - this._startTime;
+        return (this._isRunning ? this.getTimestamp() : this._stopTime) - this._startTime;
     }
 
     milliseconds(): number {
-        return Math.round((this.ticks() / ss_Stopwatch.frequency) * 1000);
+        return Math.round((this.ticks() / Stopwatch.frequency) * 1000);
     }
 
     timeSpan(): TimeSpan {
@@ -35,19 +34,19 @@ export default class Stopwatch {
     }
 
     start(): void {
-        if (this.isRunning) return;
+        if (this._isRunning) return;
         this._startTime = this.getTimestamp();
-        this.isRunning = true;
+        this._isRunning = true;
     }
 
     stop(): void {
-        if (!this.isRunning) return;
+        if (!this._isRunning) return;
         this._stopTime = this.getTimestamp();
-        this.isRunning = false;
+        this._isRunning = false;
     }
 
     restart(): void {
-        this.isRunning = false;
+        this._isRunning = false;
         this.start();
     }
 }

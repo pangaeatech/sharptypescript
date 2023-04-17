@@ -44,3 +44,12 @@ jobs:
 
       - run: npx prettier --check ..
         working-directory: tpl
+
+      - run: npm run lint
+        working-directory: tpl
+
+      - run: npm run typecheck
+        working-directory: tpl
+
+      - run: npm run build
+        working-directory: tpl

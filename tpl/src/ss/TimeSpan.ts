@@ -20,7 +20,7 @@ export default class TimeSpan {
     }
 
     toString(): string {
-        var d = function (s, n) {
+        var d = function (s: string | number, n?: number) {
             return padLeftString(s + "", n || 2, 48);
         };
 

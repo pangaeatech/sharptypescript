@@ -1,4 +1,6 @@
-import { isValue } from "./index";
+interface Stringable {
+    toString: () => string;
+}
 
 export default class StringBuilder {
     private _parts: string[];
@@ -11,15 +13,15 @@ export default class StringBuilder {
         }
     }
 
-    append(o?: unknown): StringBuilder {
-        if (isValue(o)) {
+    append(o: Stringable | null | undefined): StringBuilder {
+        if (o !== null && o != undefined) {
             this._parts.push(o.toString());
         }
 
         return this;
     }
 
-    appendChar(c: string): StringBuilder {
+    appendChar(c: number): StringBuilder {
         return this.append(String.fromCharCode(c));
     }
 
@@ -29,7 +31,7 @@ export default class StringBuilder {
         return this;
     }
 
-    appendLineChar(c: string): StringBuilder {
+    appendLineChar(c: number): StringBuilder {
         return this.appendLine(String.fromCharCode(c));
     }
 

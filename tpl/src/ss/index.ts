@@ -1,11 +1,39 @@
 import { v4 as newGuid } from "uuid";
 
-export { Dictionary, JsDictionary } from "./Dictionary";
-export { StringBuilder } from "./StringBuilder";
-export { Stopwatch } from "./Stopwatch";
-export { TimeSpan } from "./TimeSpan";
+export { default as StringBuilder } from "./StringBuilder";
+export { default as Stopwatch } from "./Stopwatch";
+export { default as TimeSpan } from "./TimeSpan";
+
+export { utcNow, formatDate, netFormatDate } from "./dates";
+export { formatNumber, round, unbox, Nullable$1, NumberFormatInfo, compare, Int32, netFormatNumber } from "./numbers";
+export {
+    Action,
+    mkdel,
+    delegateCombine,
+    delegateRemove,
+    delegateEquals,
+    delegateClone,
+    thisFix,
+    getInvocationList
+} from "./delegates";
+export {
+    isNullOrEmptyString,
+    formatString,
+    regexpEscape,
+    netSplit,
+    compareStrings,
+    startsWithString,
+    endsWithString,
+    stringFromChar,
+    htmlDecode,
+    htmlEncode,
+    padLeftString,
+    padRightString,
+    replaceAllString
+} from "./strings";
 export {
     IDisposable,
+    Dictionary,
     ArrayEnumerator,
     ObjectEnumerator,
     IteratorBlockEnumerable,
@@ -26,24 +54,6 @@ export {
     keyExists,
     mkdict
 } from "./collections";
-export {
-    isNullOrEmptyString,
-    formatString,
-    regexpEscape,
-    netSplit,
-    compareStrings,
-    startsWithString,
-    endsWithString,
-    stringFromChar,
-    htmlDecode,
-    htmlEncode,
-    padLeftString,
-    padRightString,
-    replaceAllString
-} from "./strings";
-export { utcNow, formatDate, netFormatDate } from "./dates";
-export { formatNumber, round, unbox, Nullable$1, NumberFormatInfo, compare, Int32, netFormatNumber } from "./numbers";
-export { Action, mkdel, delegateCombine, delegateRemove, delegateEquals, delegateClone, thisFix, getInvocationList } from "./delegates";
 
 /** An empty class for holding event arguments. */
 export class EventArgs {
@@ -56,9 +66,9 @@ export function isNullOrUndefined(item: unknown): boolean {
 }
 
 /** Returns the first item that is not null or undefined. */
-export function coalesce<T>(...items: (T | undefined)[]): T | undefined {
-    for (item of items) {
-        if (!isNullOrUndefined(item)) {
+export function coalesce<T>(...items: (T | null | undefined)[]): T | undefined {
+    for (const item of items) {
+        if (item !== undefined && item !== null) {
             return item;
         }
     }
@@ -68,7 +78,7 @@ export function coalesce<T>(...items: (T | undefined)[]): T | undefined {
 
 /** Returns whether or not the specified item is not null nor undefined. */
 export function isValue(item: unknown): boolean {
-    return item !== ull && item !== undefined;
+    return item !== null && item !== undefined;
 }
 
 /** Returns whether or not the specified items are reference equal. */
@@ -85,50 +95,63 @@ export function staticEquals(a: unknown, b: unknown): boolean {
 export const Guid = { newGuid };
 
 /** Perform a shallow copy of an object. */
-export function shallowCopy(source: unknown, target: unknown): void {
+export function shallowCopy(source: unknown, target: object): void {
     Object.assign(target, source);
 }
 
-export type Type<T> = { new (): T };
+export interface Type<T> {
+    new (): T;
 
-export function cast<F, T>(o: F, typ: Type<T>): T {
+    createInstance?: () => T;
+}
+
+export function cast<F extends T, T>(o: F, typ: Type<T>): T {
     return o as T;
 }
 
+export function safeCast<F extends T, T>(o: F, typ: Type<T>): T {
+    return o as T;
+}
+
+/* eslint-disable @typescript-eslint/ban-types */
+
 export function getDefaultValue<T>(typ: Type<T>): T | null {
-    if (type === Boolean) {
-        return false;
+    if (typ === (Boolean as Type<Boolean>)) {
+        return new Boolean(false) as unknown as T;
     }
-    if (type === Date) {
-        return new Date(0);
+
+    if (typ === (Date as Type<Date>)) {
+        return new Date(0) as unknown as T;
     }
-    if (type === Number) {
-        return 0;
+
+    if (typ === (Number as Type<Number>)) {
+        return new Number(0) as unknown as T;
     }
 
     return null;
 }
 
 export function createInstance<T>(typ: Type<T>): T {
-    if (typeof type.createInstance === "function") {
-        return type.createInstance();
+    if (typeof typ.createInstance === "function") {
+        return typ.createInstance();
     }
 
-    if (type === Boolean) {
-        return false;
+    if (typ === (Boolean as Type<Boolean>)) {
+        return new Boolean(false) as unknown as T;
     }
 
-    if (type === Date) {
-        return new Date(0);
+    if (typ === (Date as Type<Date>)) {
+        return new Date(0) as unknown as T;
+    }
+    if (typ === (Number as Type<Number>)) {
+        return new Number(0) as unknown as T;
     }
 
-    if (type === Number) {
-        return 0;
-    }
-
-    if (type === String) {
-        return "";
+    if (typ === (String as Type<String>)) {
+        return new String("") as unknown as T;
     }
 
     return new typ();
 }
+
+/* eslint-enable @typescript-eslint/ban-types */

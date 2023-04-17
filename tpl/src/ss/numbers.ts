@@ -1,20 +1,23 @@
+import { isValue, isNullOrUndefined } from "./index";
+import { formatString, startsWithString, padLeftString } from "./strings";
+
 /** Formats the specified number using the format string. */
 export function formatNumber(n: number, format: string): string {
     if (isNullOrUndefined(format) || format.length == 0 || format == "i") {
-        return num.toString();
+        return n.toString();
     }
 
-    return netFormatNumber(num, format);
+    return netFormatNumber(n, format);
 }
 
 export function round(n: number, d?: number, rounding?: boolean) {
     const m = Math.pow(10, d || 0);
     n *= m;
-    const sign = (n > 0) | -(n < 0);
+    const sign: number = (n > 0 ? 1 : 0) | -(n < 0 ? 1 : 0);
 
     if (n % 1 === 0.5 * sign) {
         var f = Math.floor(n);
-        return (f + (rounding ? sign > 0 : (f % 2) * sign)) / m;
+        return (f + (rounding ? (sign > 0 ? 1 : 0) : (f % 2) * sign)) / m;
     }
 
     return Math.round(n) / m;
@@ -36,27 +39,27 @@ export class Nullable$1 {
     }
 
     static gt(a?: Date | number, b?: Date | number): boolean {
-        return isValue(a) && isValue(b) && a > b;
+        return a !== undefined && b != undefined && a > b;
     }
 
     static ge(a?: Date | number, b?: Date | number): boolean {
-        return isValue(a) && isValue(b) && a >= b;
+        return a !== undefined && b != undefined && a >= b;
     }
 
     static lt(a?: Date | number, b?: Date | number): boolean {
-        return isValue(a) && isValue(b) && a < b;
+        return a !== undefined && b != undefined && a < b;
     }
 
     static le(a?: Date | number, b?: Date | number): boolean {
-        return isValue(a) && isValue(b) && a <= b;
+        return a !== undefined && b != undefined && a <= b;
     }
 
     static add(a?: number, b?: number): number | null {
-        return isValue(a) && isValue(b) ? a + b : null;
+        return a !== undefined && b != undefined ? a + b : null;
     }
 
     static sub(a?: number, b?: number): number | null {
-        return isValue(a) && isValue(b) ? a - b : null;
+        return a !== undefined && b != undefined ? a - b : null;
     }
 }
 
@@ -167,7 +170,7 @@ export function netFormatNumber(num: number, format: string): string {
     switch (fs) {
         case "d":
         case "D":
-            s = parseInt(Math.abs(num)).toString();
+            s = Math.trunc(Math.abs(num)).toString();
             if (precision != -1) {
                 s = padLeftString(s, precision, 0x30);
             }
@@ -177,7 +180,7 @@ export function netFormatNumber(num: number, format: string): string {
             break;
         case "x":
         case "X":
-            s = parseInt(Math.abs(num)).toString(16);
+            s = Math.trunc(Math.abs(num)).toString(16);
             if (fs == "X") {
                 s = s.toUpperCase();
             }
@@ -219,47 +222,21 @@ export function netFormatNumber(num: number, format: string): string {
             break;
         case "c":
         case "C":
-            if (precision == -1) {
-                precision = NumberFormatInfo.invariantInfo.currencyDecimalDigits;
-            }
-            s = Math.abs(num).toFixed(precision).toString();
-            if (precision && NumberFormatInfo.invariantInfo.currencyDecimalSeparator != ".") {
-                var index = s.indexOf(".");
-                s = s.substr(0, index) + NumberFormatInfo.invariantInfo.currencyDecimalSeparator + s.substr(index + 1);
-            }
-            s = _commaFormatNumber(
-                s,
-                NumberFormatInfo.invariantInfo.currencyGroupSizes,
-                NumberFormatInfo.invariantInfo.currencyDecimalSeparator,
-                NumberFormatInfo.invariantInfo.currencyGroupSeparator
+            s = formatString(
+                "{0}{1}{2}",
+                num < 0 ? "-" : "",
+                NumberFormatInfo.invariantInfo.currencySymbol,
+                netFormatNumber(Math.abs(num), "N")
             );
-            if (num < 0) {
-                s = formatString(NumberFormatInfo.invariantInfo.currencyNegativePattern, s);
-            } else {
-                s = formatString(NumberFormatInfo.invariantInfo.currencyPositivePattern, s);
-            }
             break;
         case "p":
         case "P":
-            if (precision == -1) {
-                precision = NumberFormatInfo.invariantInfo.percentDecimalDigits;
-            }
-            s = (Math.abs(num) * 100.0).toFixed(precision).toString();
-            if (precision && NumberFormatInfo.invariantInfo.percentDecimalSeparator != ".") {
-                var index = s.indexOf(".");
-                s = s.substr(0, index) + NumberFormatInfo.invariantInfo.percentDecimalSeparator + s.substr(index + 1);
-            }
-            s = _commaFormatNumber(
-                s,
-                NumberFormatInfo.invariantInfo.percentGroupSizes,
-                NumberFormatInfo.invariantInfo.percentDecimalSeparator,
-                NumberFormatInfo.invariantInfo.percentGroupSeparator
+            s = formatString(
+                "{0}{1}{2}",
+                num < 0 ? "-" : "",
+                netFormatNumber(Math.abs(num) * 100, "N"),
+                NumberFormatInfo.invariantInfo.percentSymbol
             );
-            if (num < 0) {
-                s = formatString(NumberFormatInfo.invariantInfo.percentNegativePattern, s);
-            } else {
-                s = formatString(NumberFormatInfo.invariantInfo.percentPositivePattern, s);
-            }
             break;
     }
 

@@ -1,56 +1,60 @@
-interface Action {
+export interface Action {
     (): void;
 }
 
-interface Delegate extends Action {
+export interface Delegate extends Action {
     (): void;
 
     _targets: Action[];
 }
 
-export function mkdel<T>(obj: T | undefined | null, method: (o?: T) => void): Delegate {
-    const del = function() { 
-        for (action of arguments.callee._targets) {
+function _mkdel(targets: Action[]): Delegate {
+    const del = function () {
+        for (const action of (arguments.callee as Delegate)._targets) {
             action();
         }
     };
 
-    if (obj !== null && obj !== undefined) {
-        del._targets = [ () => { method(obj); } ];
-    } else {
-        del._targets = [ method ];
-    }
+    del._targets = targets;
 
     return del;
+}
+
+export function mkdel<T>(obj: T | undefined | null, method: (o?: T) => void): Delegate {
+    if (obj !== null && obj !== undefined) {
+        return _mkdel([
+            () => {
+                method(obj);
+            }
+        ]);
+    }
+
+    return _mkdel([method]);
 }
 
 export function delegateCombine(d1: Delegate, d2: Delegate): Delegate {
-    const del = function() { 
-        for (action of arguments.callee._targets) {
-            action();
-        }
-    };
-
-    del._targets = [...d1.targets, ...d2.targets];
-
-    return del;
+    return _mkdel([...d1._targets, ...d2._targets]);
 }
 
-export function delegateRemove(d1: Delegate, d2: Delegate): Delegate {
-    const del = function() { 
-        for (action of arguments.callee._targets) {
-            action();
-        }
-    };
-
-    del._targets = [];
-    for (d of d1._targets) {
-        if (!(d in d2._targets)) {
-            del._targets.push(d);
+function _contains(targets: Action[], item: Action): boolean {
+    for (const target of targets) {
+        if (target === item) {
+            return true;
         }
     }
 
-    return del;
+    return false;
+}
+
+export function delegateRemove(d1: Delegate, d2: Delegate): Delegate {
+    const targets: Action[] = [];
+    for (const d of d1._targets) {
+        if (!_contains(d2._targets, d)) {
+            targets.push(d);
+        }
+    }
+
+    return _mkdel(targets);
 }
 
 export function delegateEquals(a: Delegate, b: Delegate): boolean {
@@ -79,23 +83,16 @@ export function delegateEquals(a: Delegate, b: Delegate): boolean {
 }
 
 export function delegateClone(source: Delegate): Delegate {
-    const del = function() { 
-        for (action of arguments.callee._targets) {
-            action();
-        }
-    };
-
-    del._targets = [...source.targets];
-
-    return del;
+    return _mkdel([...source._targets]);
 }
 
-export function thisFix(source: Action): Action {
+/* eslint-disable-next-line @typescript-eslint/ban-types */
+export function thisFix<T extends Function>(source: T): T {
     return function () {
-        var x = [this];
+        var x: any[] = [undefined];
         for (var i = 0; i < arguments.length; i++) x.push(arguments[i]);
         return source.apply(source, x);
-    };
+    } as unknown as T;
 }
 
 export function getInvocationList(delegate: Delegate): Action[] {
