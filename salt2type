@@ -143,20 +143,20 @@ class ClassDef:
 ######################
 
 
-def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef], List[str]]:
+def read_js(filename: str, ignfile: Optional[str]) -> Tuple[str, List[ClassDef], List[str]]:
     """
     Reads in the Script# file specified by the given filename and returns its parsed contents.
 
     @param filename: The JS file to read from
-    @param blackfile: The blacklist file to read from (if applicable)
+    @param ignfile: The ignore file to read from (if applicable)
     @return: The name to pass to "ss.initAssembly" followed by all of the class definitions found in the file, followed by all of the global
         statements to execute.
     """
-    if blackfile:
-        with open(blackfile, "r") as fil:
-            blacklist = {i.strip() for i in fil.read().splitlines()}
+    if ignfile:
+        with open(ignfile, "r") as fil:
+            ignlist = {i.strip() for i in fil.read().splitlines()}
     else:
-        blacklist = set()
+        ignlist = set()
 
     with open(filename, "r") as fil:
         lines = fil.read().splitlines()
@@ -208,7 +208,7 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             # Class constructor
             var_id = match.group(1)
             curr_class.var_id = var_id
-            if "%s.%s" % (curr_class.namespace, curr_class.name) not in blacklist:
+            if "%s.%s" % (curr_class.namespace, curr_class.name) not in ignlist:
                 classes[var_id] = curr_class
 
             params = []
@@ -245,14 +245,14 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
                     if prop:
                         params.append(PropDef(prop))
 
-            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in blacklist:
+            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in ignlist:
                 curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, True, type_params))
 
             i = end_line
 
         elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
             # static class property
-            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in blacklist:
+            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in ignlist:
                 curr_class.props.append(PropDef(match.group(1), match.group(2), None, None, None, True))
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{$", line):
@@ -261,8 +261,7 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             end_line = re_find_index(r"^\t\}", lines, i + 1)
 
             if tmp_class:
-                tmp_class.props.append(PropDef("__class", "true", None, None, None, True))
-                add_props(tmp_class, lines[i + 1 : end_line], r"\t\t", blacklist)
+                add_props(tmp_class, lines[i + 1 : end_line], r"\t\t", ignlist)
 
                 final = lines[end_line]
                 if final == "\t});":
@@ -284,8 +283,7 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             tmp_class = classes.get(match.group(1))
 
             if tmp_class:
-                tmp_class.props.append(PropDef("__class", "true", None, None, None, True))
-                add_props(tmp_class, match.group(2).strip().split(", "), r"", blacklist)
+                add_props(tmp_class, match.group(2).strip().split(", "), r"", ignlist)
 
                 final = match.group(3)
                 if final == "":
@@ -305,8 +303,7 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             tmp_class = classes.get(match.group(1))
 
             if tmp_class:
-                tmp_class.props.append(PropDef("__interface", "true", None, None, None, True))
-                add_props(tmp_class, match.group(2).strip().split(", "), r"", blacklist)
+                add_props(tmp_class, match.group(2).strip().split(", "), r"", ignlist)
 
                 final = match.group(3)
                 if final == "":
@@ -320,19 +317,13 @@ def read_js(filename: str, blackfile: Optional[str]) -> Tuple[str, List[ClassDef
             # Generic definition
             tmp_class = classes.get(match.group(2))
             if tmp_class:
-                if match.group(1) == "Class":
-                    tmp_class.props.append(PropDef("__class", "true", None, None, None, True))
-                else:
-                    tmp_class.props.append(PropDef("__interface", "true", None, None, None, True))
-
                 tmp_class.is_generic = int(match.group(3))
 
         elif match := re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\}(, true)?\);$", line):
             # Enum definition
             tmp_class = classes.get(match.group(1))
             if tmp_class:
-                tmp_class.props.append(PropDef("__enum", "true", None, None, None, True))
-                add_props(tmp_class, match.group(2).strip().split(", "), r"", blacklist)
+                add_props(tmp_class, match.group(2).strip().split(", "), r"", ignlist)
                 tmp_class.is_enum = True
 
         elif line == "\t(function() {":
@@ -408,7 +399,7 @@ def to_text(node: Optional[ElementTree.Element]) -> str:
     return ""
 
 
-def add_props(curr_class: ClassDef, lines: List[str], prefix: str, blacklist: Set) -> None:
+def add_props(curr_class: ClassDef, lines: List[str], prefix: str, ignlist: Set) -> None:
     """
     Adds the properties and methods specified in the given source to the
     specified class.  Uses the prefix to determine the current indentation
@@ -444,12 +435,12 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str, blacklist: Se
                     if prop:
                         params.append(PropDef(prop))
 
-            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in blacklist:
+            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in ignlist:
                 curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, None, type_params))
             i = end_line
         elif match := re.match(r"^%s(.*): (.*[^,]),?$" % prefix, line):
             # Property
-            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in blacklist:
+            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in ignlist:
                 curr_class.props.append(PropDef(match.group(1), match.group(2)))
         else:
             raise Exception("Unsupported inner class line: %s" % line)
@@ -466,15 +457,13 @@ def to_type(raw_type: str) -> str:
 
     raw_type = re.sub(r"\bbool\b", "boolean", raw_type)
     raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
-    raw_type = re.sub(r"\b(List|ss\.IEnumerable|ss\.ICollection)\b", "Array", raw_type)
-    raw_type = re.sub(r"\b(ss\.JsDate|JsDate)\b", "Date", raw_type)
+    raw_type = re.sub(r"\b(ss\.)?(List|IEnumerable|ICollection)\b", "Array", raw_type)
+    raw_type = re.sub(r"\b(ss\.)?JsDate\b", "Date", raw_type)
     raw_type = re.sub(r"\bObject\b", "object", raw_type)
-    raw_type = re.sub(r"\bJsDictionary\b", "ss.Dictionary", raw_type)
     raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
-    raw_type = re.sub(r"\bDelegate\b", "Action", raw_type)
-
-    raw_type = re.sub(r"^delegate (.*)$", r"Action< \1 >", raw_type)
+    raw_type = re.sub(r"\bDelegate\b", "Action<void>", raw_type)
+    raw_type = re.sub(r"^delegate (.*)$", r"Action<\1>", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
     if optional:
@@ -767,11 +756,6 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], asm_name: st
         fil.write("\n")
         for glob in globs:
             fil.write("%s\n" % glob)
-
-        fil.write("\n")
-        for item in defs:
-            if item.var_id:
-                fil.write("ss.registerClass('%s', '%s', '%s', %s);\n" % (asm_name, item.namespace, item.name, item.var_id))
 
 
 ###################

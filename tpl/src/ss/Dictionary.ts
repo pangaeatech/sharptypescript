@@ -1,75 +1,81 @@
 export interface Pointer<T> {
-  $: T;
+    $: T;
 }
 
-export default class Dictionary<K, V> {
-  [key: K]: V;
+interface DictData<T> {
+    [key: string]: T;
+}
 
-  add(key: K, value: V) {
-    if (key in this) {
-      throw "Key " + key + " already exists.";
+export type JsDictionary = DictData<unknown>;
+
+export default class Dictionary<K extends string, V> {
+    private data: DictData<V>;
+
+    constructor() {
+        data = {};
     }
 
-    this[key] = value;
-  }
+    add(key: K, value: V) {
+        if (key in this.data) {
+            throw "Key " + key + " already exists.";
+        }
 
-  set_item(key: K, value: V) {
-    this[key] = value;
-  }
-
-  get_item(key: K): V {
-    var v = this[key];
-    if (v === undefined) {
-      throw "Key " + key + " does not exist.";
-    }
-    return v;
-  }
-
-  tryGetValue(key: K, value: Pointer<V>): boolean {
-    var v = this[key];
-    if (v !== undefined) {
-      value.$ = v;
-      return true;
-    } else {
-      value.$ = undefined;
-      return false;
-    }
-  }
-
-  containsKey(key: K): boolean {
-    return key in this;
-  }
-
-  clear(): void {
-    for (let n in this) {
-      if (this.hasOwnProperty(n)) {
-        delete this[n];
-      }
-    }
-  }
-
-  remove(key: K): boolean {
-    if (key in this) {
-      delete this[key];
-      return true;
+        this.data[key] = value;
     }
 
-    return false;
-  }
+    set_item(key: K, value: V) {
+        this.data[key] = value;
+    }
 
-  get_count(): number {
-    return Object.keys(this).length;
-  }
+    get_item(key: K): V {
+        var v = this.data[key];
+        if (v === undefined) {
+            throw "Key " + key + " does not exist.";
+        }
+        return v;
+    }
 
-  get_keys(): K[] {
-    return Object.keys(this);
-  }
+    tryGetValue(key: K, value: Pointer<V>): boolean {
+        var v = this.data[key];
+        if (v !== undefined) {
+            value.$ = v;
+            return true;
+        } else {
+            value.$ = undefined;
+            return false;
+        }
+    }
 
-  get_values(): V[] {
-    return Object.values(this);
-  }
+    containsKey(key: K): boolean {
+        return key in this.data;
+    }
 
-  contains(v: V): boolean {
-    return v in Object.values(this);
-  }
+    clear(): void {
+        this.data = {};
+    }
+
+    remove(key: K): boolean {
+        if (key in this.data) {
+            delete this.data[key];
+            return true;
+        }
+
+        return false;
+    }
+
+    get_count(): number {
+        return Object.keys(this.data).length;
+    }
+
+    get_keys(): K[] {
+        return Object.keys(this.data);
+    }
+
+    get_values(): V[] {
+        return Object.values(this.data);
+    }
+
+    contains(v: V): boolean {
+        return v in Object.values(this.data);
+    }
 }
