@@ -18,7 +18,7 @@ export interface IEnumerator<T> extends IDisposable {
 }
 
 /** An enumerator that works over arrays. */
-export class ArrayEnumerator<T> implements IEnumerator {
+export class ArrayEnumerator<T> implements IEnumerator<T> {
     private _array: T[];
     private _index: number;
 
@@ -53,7 +53,7 @@ interface ObjectEntry<T> {
 }
 
 /** An enumerator that works over objects. */
-export class ObjectEnumerator<T> implements IEnumerator {
+export class ObjectEnumerator<T> implements IEnumerator<ObjectEntry<T>> {
     private _keys: string[];
     private _index: number;
     private _object: Dictionary<T>;
@@ -97,14 +97,14 @@ export class IteratorBlockEnumerable<T> {
     }
 }
 
-export class IteratorBlockEnumerator<T> implements IEnumerator {
-    private _moveNext: ($this: unknown) => void;
+export class IteratorBlockEnumerator<T> implements IEnumerator<T> {
+    private _moveNext: ($this: unknown) => boolean;
     private _getCurrent: ($this: unknown) => T;
     private _dispose?: ($this?: unknown) => void;
     private _this: unknown;
 
     constructor(
-        moveNext: ($this: unknown) => void,
+        moveNext: ($this: unknown) => boolean,
         getCurrent: ($this: unknown) => T,
         dispose: (($this?: unknown) => void) | undefined,
         $this: unknown
@@ -115,7 +115,7 @@ export class IteratorBlockEnumerator<T> implements IEnumerator {
         this._this = $this;
     }
 
-    moveNext(): void {
+    moveNext(): boolean {
         try {
             return this._moveNext(this._this);
         } catch (ex) {

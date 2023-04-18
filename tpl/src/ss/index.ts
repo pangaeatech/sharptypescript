@@ -115,16 +115,16 @@ export function safeCast<F extends T, T>(o: F, typ: Type<T>): T {
 /* eslint-disable @typescript-eslint/ban-types */
 
 export function getDefaultValue<T>(typ: Type<T>): T | null {
-    if (typ === (Boolean as Type<Boolean>)) {
-        return new Boolean(false) as unknown as T;
+    if (referenceEquals(typ, Boolean)) {
+        return false as unknown as T;
     }
 
-    if (typ === (Date as Type<Date>)) {
+    if (referenceEquals(typ, Date)) {
         return new Date(0) as unknown as T;
     }
 
-    if (typ === (Number as Type<Number>)) {
-        return new Number(0) as unknown as T;
+    if (referenceEquals(typ, Number)) {
+        return 0 as unknown as T;
     }
 
     return null;
@@ -135,19 +135,20 @@ export function createInstance<T>(typ: Type<T>): T {
         return typ.createInstance();
     }
 
-    if (typ === (Boolean as Type<Boolean>)) {
-        return new Boolean(false) as unknown as T;
+    if (referenceEquals(typ, Boolean)) {
+        return false as unknown as T;
     }
 
-    if (typ === (Date as Type<Date>)) {
+    if (referenceEquals(typ, Date)) {
         return new Date(0) as unknown as T;
     }
-    if (typ === (Number as Type<Number>)) {
-        return new Number(0) as unknown as T;
+
+    if (referenceEquals(typ, Number)) {
+        return 0 as unknown as T;
     }
 
-    if (typ === (String as Type<String>)) {
-        return new String("") as unknown as T;
+    if (referenceEquals(typ, String)) {
+        return "" as unknown as T;
     }
 
     return new typ();
