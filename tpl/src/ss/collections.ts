@@ -1,5 +1,3 @@
-import { isValue } from "./index";
-
 /** A dictionary with string keys. */
 export interface Dictionary<T> {
     [key: string]: T;
@@ -175,8 +173,8 @@ export function arrayAddRange<T>(a: T[], b: T[]): void {
 }
 
 /** Extract items from an array. */
-export function arrayExtract<T>(a: T[], start: number, count: number): T[] {
-    if (!isValue(count)) {
+export function arrayExtract<T>(a: T[], start: number, count?: number): T[] {
+    if (!count) {
         return a.slice(start);
     }
 
