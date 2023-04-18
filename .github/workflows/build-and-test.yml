@@ -51,5 +51,8 @@ jobs:
       - run: npm run typecheck
         working-directory: tpl
 
+      - run: npm run test
+        working-directory: tpl
+
       - run: npm run build
         working-directory: tpl

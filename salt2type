@@ -468,13 +468,15 @@ def to_type(raw_type: str) -> str:
 
     raw_type = re.sub(r"\bbool\b", "boolean", raw_type)
     raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
-    raw_type = re.sub(r"\b(ss\.)?(List|IEnumerable|ICollection)\b", "Array", raw_type)
+    raw_type = re.sub(r"\b(ss\.)?(IList|List|IEnumerable|ICollection)\b", "Array", raw_type)
     raw_type = re.sub(r"\b(ss\.)?JsDate\b", "Date", raw_type)
     raw_type = re.sub(r"\bObject\b", "object", raw_type)
     raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
     raw_type = re.sub(r"\bDelegate\b", "Action<void>", raw_type)
     raw_type = re.sub(r"^delegate (.*)$", r"Action<\1>", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary<", r"Record<", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<)", r"Record<string,unknown>\1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
     if optional:

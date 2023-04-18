@@ -33,9 +33,6 @@ export {
 } from "./strings";
 export {
     IDisposable,
-    ICollection,
-    IEnumerable,
-    Dictionary,
     ArrayEnumerator,
     ObjectEnumerator,
     IteratorBlockEnumerable,

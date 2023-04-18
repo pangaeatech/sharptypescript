@@ -89,7 +89,7 @@ export function delegateClone(source: Delegate): Delegate {
 /* eslint-disable-next-line @typescript-eslint/ban-types */
 export function thisFix<T extends Function>(source: T): T {
     return function () {
-        var x: any[] = [undefined];
+        var x: any[] = [this as void];
         for (var i = 0; i < arguments.length; i++) x.push(arguments[i]);
         return source.apply(source, x);
     } as unknown as T;

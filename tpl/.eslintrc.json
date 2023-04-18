@@ -45,5 +45,16 @@
     "prefer-rest-params": "off",
     "prefer-spread": "off",
     "unused-imports/no-unused-imports": "warn"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/__tests__/**", "**/__mocks__/**"],
+      "rules": {
+        "no-magic-numbers": "off",
+        "no-console": "off",
+        "no-var": "off",
+        "complexity": "off"
+      }
+    }
+  ]
 }

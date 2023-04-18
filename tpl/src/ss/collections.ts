@@ -1,8 +1,5 @@
 import { isValue } from "./index";
 
-export type ICollection = T[];
-export type IEnumerable = T[];
-
 /** A dictionary with string keys. */
 export interface Dictionary<T> {
     [key: string]: T;
@@ -13,7 +10,15 @@ export interface IDisposable {
     dispose: () => void;
 }
 
-export class ArrayEnumerator<T> implements IDisposable {
+/** An interface for all Enumerators to implement. */
+export interface IEnumerator<T> extends IDisposable {
+    moveNext: () => boolean;
+    reset: () => void;
+    current: () => T;
+}
+
+/** An enumerator that works over arrays. */
+export class ArrayEnumerator<T> implements IEnumerator {
     private _array: T[];
     private _index: number;
 
@@ -47,7 +52,8 @@ interface ObjectEntry<T> {
     value: T;
 }
 
-export class ObjectEnumerator<T> implements IDisposable {
+/** An enumerator that works over objects. */
+export class ObjectEnumerator<T> implements IEnumerator {
     private _keys: string[];
     private _index: number;
     private _object: Dictionary<T>;
@@ -91,7 +97,7 @@ export class IteratorBlockEnumerable<T> {
     }
 }
 
-export class IteratorBlockEnumerator<T> implements IDisposable {
+export class IteratorBlockEnumerator<T> implements IEnumerator {
     private _moveNext: ($this: unknown) => void;
     private _getCurrent: ($this: unknown) => T;
     private _dispose?: ($this?: unknown) => void;
