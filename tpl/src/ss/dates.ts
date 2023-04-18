@@ -1,5 +1,5 @@
 import StringBuilder from "./StringBuilder";
-import { padLeftString, isNullOrEmptyString } from "./strings";
+import { padLeftString } from "./strings";
 
 export type JsDate = Date;
 
@@ -18,8 +18,8 @@ export function utcNow(): Date {
 }
 
 /** Formats the specified date using the format string. */
-export function formatDate(d: Date, format: string): string {
-    if (isNullOrEmptyString(format) || format == "i") {
+export function formatDate(d: Date, format?: string): string {
+    if (!format || format == "i") {
         return d.toString();
     }
 
@@ -77,7 +77,11 @@ const DateFormatInfo = {
 
 const _formatRE = /'.*?[^\\]'|dddd|ddd|dd|d|MMMM|MMM|MM|M|yyyy|yy|y|hh|h|HH|H|mm|m|ss|s|tt|t|fff|ff|f|zzz|zz|z/g;
 
-export function netFormatDate(dt: Date, format: string): string {
+export function netFormatDate(dt: Date, format?: string): string {
+    if (!format) {
+        return dt.toString();
+    }
+
     if (format.length == 1) {
         switch (format) {
             case "f":
