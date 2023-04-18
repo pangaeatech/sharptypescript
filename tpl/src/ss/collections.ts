@@ -1,5 +1,8 @@
 import { isValue } from "./index";
 
+export type ICollection = T[];
+export type IEnumerable = T[];
+
 /** A dictionary with string keys. */
 export interface Dictionary<T> {
     [key: string]: T;

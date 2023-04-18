@@ -4,7 +4,7 @@ export { default as StringBuilder } from "./StringBuilder";
 export { default as Stopwatch } from "./Stopwatch";
 export { default as TimeSpan } from "./TimeSpan";
 
-export { utcNow, formatDate, netFormatDate } from "./dates";
+export { JsDate, utcNow, formatDate, netFormatDate } from "./dates";
 export { formatNumber, round, unbox, Nullable$1, NumberFormatInfo, compare, Int32, netFormatNumber } from "./numbers";
 export {
     Action,
@@ -33,6 +33,8 @@ export {
 } from "./strings";
 export {
     IDisposable,
+    ICollection,
+    IEnumerable,
     Dictionary,
     ArrayEnumerator,
     ObjectEnumerator,

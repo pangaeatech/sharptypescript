@@ -1,6 +1,8 @@
 import StringBuilder from "./StringBuilder";
 import { padLeftString, isNullOrEmptyString } from "./strings";
 
+export type JsDate = Date;
+
 /** Returns the current UTC date. */
 export function utcNow(): Date {
     var d = new Date();
