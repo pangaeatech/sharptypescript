@@ -145,6 +145,10 @@ export interface Type<T> {
     new (): T;
 
     createInstance?: () => T;
+
+    __typeName?: string;
+    name?: string;
+    toString: () => string;
 }
 
 export function cast<F extends T, T>(o: F, typ: Type<T>): T {
@@ -153,6 +157,18 @@ export function cast<F extends T, T>(o: F, typ: Type<T>): T {
 
 export function safeCast<F extends T, T>(o: F, typ: Type<T>): T {
     return o as T;
+}
+
+export function isInstanceOfType<T1, T2>(instance: T1 | null | undefined, typ: Type<T2>): boolean {
+    if (instance === null || instance === undefined) {
+        return false;
+    }
+
+    return isAssignableFrom(typ, instance.constructor as Type<T1>);
+}
+
+export function isAssignableFrom<T1, T2>(target: Type<T1>, typ: Type<T2>): boolean {
+    return referenceEquals(target, typ) || typ.prototype instanceof target;
 }
 
 /* eslint-disable @typescript-eslint/ban-types */
@@ -198,3 +214,33 @@ export function createInstance<T>(typ: Type<T>): T {
 }
 
 /* eslint-enable @typescript-eslint/ban-types */
+
+export function getInstanceType<T>(instance: T | null): Type<T> {
+    if (!instance) {
+        throw "Cannot get type of null";
+    }
+
+    try {
+        return instance.constructor as unknown as Type<T>;
+    } catch (ex) {
+        return Object as unknown as Type<T>;
+    }
+}
+
+export function getTypeFullName<T>(typ: Type<T>): string {
+    return typ.__typeName || typ.name || (typ.toString().match(/^\s*function\s*([^\s(]+)/) || [])[1] || "Object";
+}
+
+export function getTypeName<T>(typ: Type<T>): string {
+    var fullName = getTypeFullName(typ);
+    var bIndex = fullName.indexOf("[");
+    var nsIndex = fullName.lastIndexOf(".", bIndex >= 0 ? bIndex : fullName.length);
+    return nsIndex > 0 ? fullName.substr(nsIndex + 1) : fullName;
+}
+
+export function getTypeNamespace<T>(typ: Type<T>): string {
+    var fullName = getTypeFullName(typ);
+    var bIndex = fullName.indexOf("[");
+    var nsIndex = fullName.lastIndexOf(".", bIndex >= 0 ? bIndex : fullName.length);
+    return nsIndex > 0 ? fullName.substr(0, nsIndex) : "";
+}
