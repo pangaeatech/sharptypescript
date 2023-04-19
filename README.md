@@ -32,13 +32,13 @@ Most applications share objects between the server-side and client-side code and
 
 However, if you need/wish to write your client-side code in TypeScript and your server-side code in C#, then the best approach is to have your C# server-side code generate an OpenAPI document detailing your types (using a tool such as [SwaggerGen](https://www.nuget.org/packages/Swashbuckle.AspNetCore.SwaggerGen/)) and then convert that into a TypeScript file using a tool such as [openapi-typescript](https://www.npmjs.com/package/openapi-typescript).
 
-### Usage
+## Usage
 
-#### To migrate an existing Script# project to TypeScript:
+### To migrate an existing Script# project to TypeScript:
 
 1. Build the Script# project using Saltarelle in Debug mode:
    - `MSBuild.exe Project.csproj /p:Configuration=Debug`
-2. Build XML documentation using Doxygen:
+2. Build XML documentation for the Script# project using Doxygen:
    - Copy `Doxyfile` from salt2type into your project's directory
    - `Doxygen Doxyfile`
    - `cd xml && xsltproc combine.xslt index.xml > all.xml`
@@ -62,19 +62,16 @@ However, if you need/wish to write your client-side code in TypeScript and your 
 
 - Doxygen 1.8.17
 - MSBuild 14.0
+- nodejs 16.19.1
+- npm 8.1.0
 - Python 3.8.10
 - Saltarelle.Compiler 2.7.0
 - xsltproc 1.1.34
 
 ### Limitations
 
-This code only supports the subset of Script# that we needed to migrate our own legacy codebases. It does not support all possible Script# codebases. If the implementation of `ss/index.ts` does not include everything you need, you can pull in additional functionality from https://github.com/Saltarelle/SaltarelleCompiler/tree/develop/Runtime/CoreLib.Script/
+This code only supports the subset of Script# that we needed to migrate our own legacy codebases. It does not support all possible Script# codebases. If the TypeScript implementations in `tpl/ss` do not include something you need, you can pull in additional functionality from [the Saltarelle Project](https://github.com/Saltarelle/SaltarelleCompiler/tree/develop/Runtime/CoreLib.Script/).
 
-Typescript is fundamentally a compile-time typing system while Script# is a run-time typing system. Therefore, run-time type checking will _never_ be supported by `salt2type`. If your Script# codebase uses a lot of reflection, then you need to refactor your existing Script# codebase to remove reflection prior to using `salt2type` to migrate it.
+Typescript is fundamentally a compile-time typing system while Script# is a run-time typing system. Therefore, run-time type checking will _never_ be supported by `salt2type`. If your Script# codebase relies heavily on run-time type-checking (e.g. reflection), then you will need to refactor your existing Script# codebase prior to using `salt2type` to migrate it.
 
-This code intentionally migrates away from Script# implementations of classes which is now supported natively in TypeScript. The following classes will not be supported in `salt2type`:
-
-- `IDictionary<K,V>` (use `Record<K,V>` instead)
-- `Dictionary<K,V>` (use `Record<K,V>` instead)
-- `JsDictionary` (use `Record<string,unknown>` instead)
-- `ICollection<T>` (use `T[]` instead)
+This code intentionally migrates away from custom implementations of classes which are now supported natively in TypeScript (e.g. `Record<K,V>` instead of `Dictionary<K,V>`) and away from polyfills for old browser support. If you need old browser support, you should consider using a library such as `es6-shim` or a service such as [polyfill.io](http://cdn.polyfill.io).
