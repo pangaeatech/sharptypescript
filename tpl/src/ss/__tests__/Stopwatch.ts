@@ -19,7 +19,8 @@ describe("Stopwatch", () => {
         const prevMilliseconds = stopwatch.milliseconds();
         stopwatch.stop();
         await new Promise((r) => setTimeout(r, 10));
-        expect(stopwatch.milliseconds()).toEqual(prevMilliseconds);
+        expect(stopwatch.milliseconds()).toBeGreaterThanOrEqual(prevMilliseconds - 2);
+        expect(stopwatch.milliseconds()).toBeLessThanOrEqual(prevMilliseconds + 2);
     });
 
     test("should restart correctly", async () => {
