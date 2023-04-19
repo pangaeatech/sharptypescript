@@ -18,7 +18,7 @@ describe("Stopwatch", () => {
         await new Promise((r) => setTimeout(r, 2));
         const prevMilliseconds = stopwatch.milliseconds();
         stopwatch.stop();
-        await new Promise((r) => setTimeout(r, 2));
+        await new Promise((r) => setTimeout(r, 10));
         expect(stopwatch.milliseconds()).toEqual(prevMilliseconds);
     });
 

@@ -1,3 +1,10 @@
+import {
+    ArgumentException,
+    ArgumentOutOfRangeException,
+    InvalidOperationException,
+    NotSupportedException
+} from "./exceptions";
+
 /** A dictionary with string keys. */
 export interface Dictionary<T> {
     [key: string]: T;
@@ -13,6 +20,10 @@ export interface IEnumerator<T> extends IDisposable {
     moveNext: () => boolean;
     reset: () => void;
     current: () => T;
+}
+
+export interface IEnumerable<T> {
+    getEnumerator: () => IEnumerator<T>;
 }
 
 /** An enumerator that works over arrays. */
@@ -36,7 +47,7 @@ export class ArrayEnumerator<T> implements IEnumerator<T> {
 
     current(): T {
         if (this._index < 0 || this._index >= this._array.length) {
-            throw "Invalid operation";
+            throw new InvalidOperationException();
         }
 
         return this._array[this._index];
@@ -73,7 +84,7 @@ export class ObjectEnumerator<T> implements IEnumerator<ObjectEntry<T>> {
 
     current(): ObjectEntry<T> {
         if (this._index < 0 || this._index >= this._keys.length) {
-            throw "Invalid operation";
+            throw new InvalidOperationException();
         }
 
         var k = this._keys[this._index];
@@ -83,29 +94,31 @@ export class ObjectEnumerator<T> implements IEnumerator<ObjectEntry<T>> {
     dispose(): void {}
 }
 
-export class IteratorBlockEnumerable<T> {
-    private _enumerator: () => IteratorBlockEnumerator<T>;
+export class IteratorBlockEnumerable<T, X> implements IEnumerable<T> {
+    private _enumerator: ($this: X) => IteratorBlockEnumerator<T, X>;
+    private _this: X;
 
-    constructor(enumerator: () => IteratorBlockEnumerator<T>, $this: unknown) {
+    constructor(enumerator: ($this: X) => IteratorBlockEnumerator<T, X>, $this: X) {
         this._enumerator = enumerator;
+        this._this = $this;
     }
 
-    getEnumerator(): IteratorBlockEnumerator<T> {
-        return this._enumerator();
+    getEnumerator(): IteratorBlockEnumerator<T, X> {
+        return this._enumerator(this._this);
     }
 }
 
-export class IteratorBlockEnumerator<T> implements IEnumerator<T> {
-    private _moveNext: ($this: unknown) => boolean;
-    private _getCurrent: ($this: unknown) => T;
-    private _dispose?: ($this?: unknown) => void;
-    private _this: unknown;
+export class IteratorBlockEnumerator<T, X> implements IEnumerator<T> {
+    private _moveNext: ($this: X) => boolean;
+    private _getCurrent: ($this: X) => T;
+    private _dispose?: ($this: X) => void;
+    private _this: X;
 
     constructor(
-        moveNext: ($this: unknown) => boolean,
-        getCurrent: ($this: unknown) => T,
-        dispose: (($this?: unknown) => void) | undefined,
-        $this: unknown
+        moveNext: ($this: X) => boolean,
+        getCurrent: ($this: X) => T,
+        dispose: (($this: X) => void) | undefined,
+        $this: X
     ) {
         this._moveNext = moveNext;
         this._getCurrent = getCurrent;
@@ -120,7 +133,7 @@ export class IteratorBlockEnumerator<T> implements IEnumerator<T> {
             if (this._dispose) {
                 this._dispose(this._this);
             }
-            throw ex;
+            throw new InvalidOperationException();
         }
     }
 
@@ -129,7 +142,7 @@ export class IteratorBlockEnumerator<T> implements IEnumerator<T> {
     }
 
     reset(): never {
-        throw new Error("Reset is not supported.");
+        throw new NotSupportedException("Reset is not supported.");
     }
 
     dispose(): void {
@@ -163,8 +176,48 @@ export function indexOf<T>(arr: T[], item: T): number {
     return arr.indexOf(item);
 }
 
+export function getItem<T>(arr: T[], index: number): T | undefined {
+    return arr[index];
+}
+
+export function setItem<T>(arr: T[], index: number, value: T): void {
+    arr[index] = value;
+}
+
+export function removeAt<T>(arr: T[], index: number): void {
+    arr.splice(index, 1);
+}
+
+export function indexOfArray<T>(arr: T[], item: T, startIndex?: number): number {
+    return arr.indexOf(item, startIndex);
+}
+
 export function contains<T>(arr: T[], item: T): boolean {
     return indexOf(arr, item) >= 0;
+}
+
+export function arrayLength<T>(arr: T[]): number {
+    return arr.length;
+}
+
+export function arrayPeekFront<T>(arr: T[]): T {
+    if (arr.length) {
+        return arr[0];
+    }
+
+    throw new ArgumentException("Array is empty");
+}
+
+export function arrayPeekBack<T>(arr: T[]): T {
+    if (arr.length) {
+        return arr[arr.length - 1];
+    }
+
+    throw new ArgumentException("Array is empty");
+}
+
+export function arrayRemoveRange<T>(arr: T[], index: number, count: number) {
+    arr.splice(index, count);
 }
 
 /** Append values to the end of an array. */
@@ -181,9 +234,13 @@ export function arrayExtract<T>(a: T[], start: number, count?: number): T[] {
     return a.slice(start, start + count);
 }
 
-/** Noop */
+/** Clone the array */
 export function arrayFromEnumerable<T>(a: T[]): T[] {
-    return a;
+    return arrayClone(a);
+}
+
+export function arrayClone<T>(a: T[]): T[] {
+    return [...a];
 }
 
 /** Remove all items from an array. */
@@ -225,4 +282,42 @@ export function mkdict(args: string[]): Dictionary<string> {
         r[args[i]] = args[i + 1];
     }
     return r;
+}
+
+export function repeat<T>(value: T, count: number): T[] {
+    var result: T[] = [];
+    for (var i = 0; i < count; i++) {
+        result.push(value);
+    }
+    return result;
+}
+
+export function arrayFill<T>(dst: T[], val: T, index: number, count: number): void {
+    dst.fill(val, index, index + count);
+}
+
+export function arrayCopy<T>(src: T[], spos: number, dst: T[], dpos: number, len: number): void {
+    if (spos < 0 || dpos < 0 || len < 0) {
+        throw new ArgumentOutOfRangeException();
+    }
+
+    if (len > src.length - spos || len > dst.length - dpos) {
+        throw new ArgumentException();
+    }
+
+    if (spos < dpos && src === dst) {
+        while (--len >= 0) dst[dpos + len] = src[spos + len];
+    } else {
+        for (var i = 0; i < len; i++) dst[dpos + i] = src[spos + i];
+    }
+}
+
+export function arrayInsertRange<T>(arr: T[], index: number, items: T[]): void {
+    if (index === 0) {
+        arr.unshift.apply(arr, items);
+    } else {
+        for (var i = 0; i < items.length; i++) {
+            arr.splice(index + i, 0, items[i]);
+        }
+    }
 }

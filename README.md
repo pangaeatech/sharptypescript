@@ -66,10 +66,15 @@ However, if you need/wish to write your client-side code in TypeScript and your 
 - Saltarelle.Compiler 2.7.0
 - xsltproc 1.1.34
 
-### Known Limitations
+### Limitations
 
 This code only supports the subset of Script# that we needed to migrate our own legacy codebases. It does not support all possible Script# codebases. If the implementation of `ss/index.ts` does not include everything you need, you can pull in additional functionality from https://github.com/Saltarelle/SaltarelleCompiler/tree/develop/Runtime/CoreLib.Script/
 
-Typescript is fundamentally a compile-time typing system while Script# is a run-time typing system. Therefore, run-time type checking will _never_ be supported by `type2salt`. If your Script# codebase uses a lot of reflection, then you need to refactor your existing Script# codebase to remove reflection prior to using `type2salt` to migrate it.
+Typescript is fundamentally a compile-time typing system while Script# is a run-time typing system. Therefore, run-time type checking will _never_ be supported by `salt2type`. If your Script# codebase uses a lot of reflection, then you need to refactor your existing Script# codebase to remove reflection prior to using `salt2type` to migrate it.
 
-This code intentionally migrates away from Script#-specific implementations of code which is now supported natively in TypeScript (Dictionary, Date, etc.).
+This code intentionally migrates away from Script# implementations of classes which is now supported natively in TypeScript. The following classes will not be supported in `salt2type`:
+
+- `IDictionary<K,V>` (use `Record<K,V>` instead)
+- `Dictionary<K,V>` (use `Record<K,V>` instead)
+- `JsDictionary` (use `Record<string,unknown>` instead)
+- `ICollection<T>` (use `T[]` instead)

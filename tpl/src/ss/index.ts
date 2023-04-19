@@ -4,10 +4,11 @@ export { default as StringBuilder } from "./StringBuilder";
 export { default as Stopwatch } from "./Stopwatch";
 export { default as TimeSpan } from "./TimeSpan";
 
-export { JsDate, utcNow, formatDate, netFormatDate } from "./dates";
+export { JsDate, utcNow, toUTC, fromUTC, today, formatDate, netFormatDate } from "./dates";
 export { formatNumber, round, unbox, Nullable$1, NumberFormatInfo, compare, Int32, netFormatNumber } from "./numbers";
 export {
     Action,
+    Delegate,
     mkdel,
     delegateCombine,
     delegateRemove,
@@ -16,6 +17,24 @@ export {
     thisFix,
     getInvocationList
 } from "./delegates";
+export {
+    Exception,
+    AggregateException,
+    AmbiguousMatchException,
+    ArgumentException,
+    ArgumentNullException,
+    ArgumentOutOfRangeException,
+    DivideByZeroException,
+    FormatException,
+    InvalidCastException,
+    InvalidOperationException,
+    JsErrorException,
+    KeyNotFoundException,
+    NotImplementedException,
+    NotSupportedException,
+    NullReferenceException,
+    PromiseException
+} from "./exceptions";
 export {
     isNullOrEmptyString,
     formatString,
@@ -27,12 +46,19 @@ export {
     stringFromChar,
     htmlDecode,
     htmlEncode,
+    jsEncode,
     padLeftString,
     padRightString,
-    replaceAllString
+    replaceAllString,
+    parseXml,
+    isLower,
+    isUpper
 } from "./strings";
 export {
+    Dictionary,
     IDisposable,
+    IEnumerator,
+    IEnumerable,
     ArrayEnumerator,
     ObjectEnumerator,
     IteratorBlockEnumerable,
@@ -41,22 +67,39 @@ export {
     add,
     remove,
     indexOf,
+    getItem,
+    setItem,
+    removeAt,
+    indexOfArray,
     contains,
+    arrayLength,
+    arrayPeekFront,
+    arrayPeekBack,
+    arrayRemoveRange,
     arrayAddRange,
     arrayExtract,
     arrayFromEnumerable,
+    arrayClone,
     clear,
     count,
     getEnumerator,
     getKeyCount,
     clearKeys,
     keyExists,
-    mkdict
+    mkdict,
+    repeat,
+    arrayFill,
+    arrayCopy,
+    arrayInsertRange
 } from "./collections";
 
 /** An empty class for holding event arguments. */
 export class EventArgs {
     static Empty = new EventArgs();
+}
+
+export class CancelEventArgs extends EventArgs {
+    cancel = false;
 }
 
 /** Returns whether or not the specified item is null or undefined. */

@@ -1,5 +1,4 @@
 import TimeSpan from "../TimeSpan";
-import { padLeftString } from "../strings";
 
 describe("TimeSpan", () => {
     describe("constructor", () => {

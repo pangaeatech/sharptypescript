@@ -1,5 +1,4 @@
 import {
-    Action,
     Delegate,
     mkdel,
     delegateCombine,

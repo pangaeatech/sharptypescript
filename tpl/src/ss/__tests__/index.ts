@@ -212,7 +212,7 @@ describe("Cast/safeCast functions", () => {
 
     test("Type.createInstance should create an instance of the given type", () => {
         class SubClass extends MyClass {
-            age: number = 5;
+            age = 5;
         }
         const SubClassType: Type<SubClass> = SubClass;
         const instance = new SubClassType();

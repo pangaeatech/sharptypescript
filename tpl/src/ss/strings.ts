@@ -126,6 +126,11 @@ export function htmlEncode(s: string): string {
         .replace(/>/g, "&gt;");
 }
 
+export function jsEncode(s: string, q?: boolean) {
+    s = s.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"');
+    return q ? '"' + s + '"' : s;
+}
+
 export function padLeftString(s: string, totalWidth: number, ch?: number): string {
     if (s.length < totalWidth) {
         return stringFromChar(String.fromCharCode(ch || 0x20), totalWidth - s.length) + s;
@@ -145,4 +150,22 @@ export function padRightString(s: string, totalWidth: number, ch?: number): stri
 export function replaceAllString(s: string, oldValue: string, newValue: string): string {
     newValue = newValue || "";
     return s.split(oldValue).join(newValue);
+}
+
+export function parseXml(markup: string) {
+    try {
+        return new DOMParser().parseFromString(markup, "text/xml");
+    } catch (ex) {}
+
+    return null;
+}
+
+export function isLower(c: number): boolean {
+    const s = String.fromCharCode(c);
+    return s === s.toLowerCase() && s !== s.toUpperCase();
+}
+
+export function isUpper(c: number): boolean {
+    const s = String.fromCharCode(c);
+    return s !== s.toLowerCase() && s === s.toUpperCase();
 }

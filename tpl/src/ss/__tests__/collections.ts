@@ -20,6 +20,8 @@ import {
     mkdict
 } from "../collections";
 
+import { InvalidOperationException, NotSupportedException } from "../exceptions";
+
 describe("ArrayEnumerator tests", () => {
     test("ArrayEnumerator moveNext() returns true when there is a next element in the array", () => {
         const arr = ["a", "b", "c"];
@@ -75,8 +77,8 @@ describe("ArrayEnumerator tests", () => {
 });
 
 describe("ObjectEnumerator", () => {
-    let dictionary = { a: 1, b: 2, c: 3 };
-    let objectEnumerator = new ObjectEnumerator<number>(dictionary);
+    const dictionary = { a: 1, b: 2, c: 3 };
+    const objectEnumerator = new ObjectEnumerator<number>(dictionary);
 
     it("should be able to moveNext", () => {
         expect(objectEnumerator.moveNext()).toBe(true);
@@ -91,7 +93,7 @@ describe("ObjectEnumerator", () => {
         expect(() => {
             objectEnumerator.reset();
             objectEnumerator.current();
-        }).toThrow("Invalid operation");
+        }).toThrow(InvalidOperationException);
     });
 
     it("should throw error on current() when index >= keys.length", () => {
@@ -99,7 +101,7 @@ describe("ObjectEnumerator", () => {
             objectEnumerator.reset();
             while (objectEnumerator.moveNext()) {}
             objectEnumerator.current();
-        }).toThrow("Invalid operation");
+        }).toThrow(InvalidOperationException);
     });
 
     it("should return correct key and value on current()", () => {
@@ -116,9 +118,9 @@ describe("ObjectEnumerator", () => {
 describe("IteratorBlockEnumerable", () => {
     describe("getEnumerator()", () => {
         test("returns an instance of IteratorBlockEnumerator", () => {
-            const enumBlock = new IteratorBlockEnumerable<number>(
+            const enumBlock = new IteratorBlockEnumerable(
                 () =>
-                    new IteratorBlockEnumerator<number>(
+                    new IteratorBlockEnumerator(
                         () => true,
                         () => 42,
                         undefined,
@@ -135,13 +137,13 @@ describe("IteratorBlockEnumerator", () => {
     describe("moveNext()", () => {
         test("calls _moveNext function with _this argument", () => {
             const moveNext = jest.fn(() => true);
-            const iteration = new IteratorBlockEnumerator<number>(moveNext, () => 42, undefined, null);
+            const iteration = new IteratorBlockEnumerator(moveNext, () => 42, undefined, null);
             iteration.moveNext();
             expect(moveNext).toHaveBeenCalledWith(null);
         });
 
         test("returns the value returned by _moveNext function", () => {
-            const iteration = new IteratorBlockEnumerator<number>(
+            const iteration = new IteratorBlockEnumerator(
                 () => true,
                 () => 42,
                 undefined,
@@ -155,8 +157,8 @@ describe("IteratorBlockEnumerator", () => {
                 throw new Error("Exception");
             });
             const dispose = jest.fn();
-            const iteration = new IteratorBlockEnumerator<number>(moveNext, () => 42, dispose, null);
-            expect(() => iteration.moveNext()).toThrow("Exception");
+            const iteration = new IteratorBlockEnumerator(moveNext, () => 42, dispose, null);
+            expect(() => iteration.moveNext()).toThrow(InvalidOperationException);
             expect(dispose).toHaveBeenCalledWith(null);
         });
     });
@@ -164,13 +166,13 @@ describe("IteratorBlockEnumerator", () => {
     describe("current()", () => {
         test("calls _getCurrent function with _this argument", () => {
             const getCurrent = jest.fn(() => 42);
-            const iteration = new IteratorBlockEnumerator<number>(() => true, getCurrent, undefined, null);
+            const iteration = new IteratorBlockEnumerator(() => true, getCurrent, undefined, null);
             iteration.current();
             expect(getCurrent).toHaveBeenCalledWith(null);
         });
 
         test("returns the value returned by _getCurrent function", () => {
-            const iteration = new IteratorBlockEnumerator<number>(
+            const iteration = new IteratorBlockEnumerator(
                 () => true,
                 () => 42,
                 undefined,
@@ -182,20 +184,20 @@ describe("IteratorBlockEnumerator", () => {
 
     describe("reset()", () => {
         test("throws an Error", () => {
-            const iteration = new IteratorBlockEnumerator<number>(
+            const iteration = new IteratorBlockEnumerator(
                 () => true,
                 () => 42,
                 undefined,
                 null
             );
-            expect(() => iteration.reset()).toThrow(Error);
+            expect(() => iteration.reset()).toThrow(NotSupportedException);
         });
     });
 
     describe("dispose()", () => {
         test("calls _dispose function with _this argument if it is defined", () => {
             const dispose = jest.fn();
-            const iteration = new IteratorBlockEnumerator<number>(
+            const iteration = new IteratorBlockEnumerator(
                 () => true,
                 () => 42,
                 dispose,
@@ -210,7 +212,7 @@ describe("IteratorBlockEnumerator", () => {
             const moveNext = () => {
                 throw "bad";
             };
-            const iteration = new IteratorBlockEnumerator<number>(moveNext, () => 42, undefined, null);
+            const iteration = new IteratorBlockEnumerator(moveNext, () => 42, undefined, null);
             expect(() => iteration.moveNext()).toThrow();
             iteration.dispose();
             expect(dispose).not.toHaveBeenCalled();
@@ -300,7 +302,8 @@ describe("arrayExtract", () => {
 describe("arrayFromEnumerable", () => {
     test("should return the same array that was passed in", () => {
         const arr = [1, 2, 3];
-        expect(arrayFromEnumerable(arr)).toBe(arr);
+        expect(arrayFromEnumerable(arr)).not.toBe(arr);
+        expect(arrayFromEnumerable(arr)).toEqual(arr);
     });
 });
 
