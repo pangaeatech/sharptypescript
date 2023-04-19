@@ -720,7 +720,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
             fil.write("\n")
 
             if item.is_enum:
-                fil.write("export default enum %s {\n" % item.name)
+                fil.write("enum %s {\n" % item.name)
                 for prop in item.props:
                     if not prop.name.startswith("__"):
                         fil.write("\n")
@@ -729,6 +729,8 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
                         fil.write("\t%s%s,\n" % (prop.name, " = %s" % prop.def_val if prop.def_val else ""))
 
                 fil.write("}\n")
+                fil.write("\n")
+                fil.write("export default %s\n" % item.name)
                 continue
 
             if item.is_generic:
