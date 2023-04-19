@@ -475,8 +475,8 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
     raw_type = re.sub(r"\bDelegate\b", "Action<void>", raw_type)
     raw_type = re.sub(r"^delegate (.*)$", r"Action<\1>", raw_type)
-    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary<", r"Record<", raw_type)
-    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<)", r"Record<string,unknown>\1", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary\<", r"Record<", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,unknown>1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
     if optional:
@@ -663,8 +663,16 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
     @param ns_name: The namespace to export for external use
     """
     tpl_dir = os.path.join(os.path.dirname(sys.argv[0]), "tpl")
+    ignored_dirs = list(map(lambda f: os.path.join(tpl_dir, f), ("coverage", "dist", "node_modules")))
+
+    def is_ignored(dir_name: str) -> bool:
+        for ignored_dir in ignored_dirs:
+            if dir_name.startswith(ignored_dir):
+                return True
+        return False
+
     for src_dir, _, files in os.walk(tpl_dir):
-        if "node_modules" not in src_dir:
+        if not is_ignored(src_dir):
             dst_dir = src_dir.replace(tpl_dir, out_dir, 1)
             if not os.path.exists(dst_dir):
                 os.makedirs(dst_dir)
