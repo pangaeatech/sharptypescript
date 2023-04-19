@@ -755,7 +755,7 @@ def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_
     out_file.write("import * as ss from '%s/ss';\n" % go_up)
 
 
-def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], asm_name: str) -> None:
+def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
@@ -787,4 +787,4 @@ if __name__ == "__main__":
 
     copy_tpl(OUT_DIR, ASM_NAME, NS_NAME)
     gen_ts(OUT_DIR, CLASSES)
-    gen_index(OUT_DIR, CLASSES, GLOBALS, ASM_NAME)
+    gen_index(OUT_DIR, CLASSES, GLOBALS)
