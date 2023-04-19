@@ -664,7 +664,6 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
     """
     tpl_dir = os.path.join(os.path.dirname(sys.argv[0]), "tpl")
     ignored_dirs = list(map(lambda f: os.path.join(tpl_dir, f), ("coverage", "dist", "node_modules")))
-    print(ignored_dirs)
 
     def is_ignored(dir_name: str) -> bool:
         for ignored_dir in ignored_dirs:
