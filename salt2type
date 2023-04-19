@@ -719,8 +719,20 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
             write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id)
             fil.write("\n")
 
-            if item.is_generic or item.is_enum:
-                fil.write("/** %s%s **/\n" % ("[Generic]" if item.is_generic else "", "[Enum]" if item.is_enum else ""))
+            if item.is_enum:
+                fil.write("export default enum %s {\n" % item.name)
+                for prop in item.props:
+                    if not prop.name.startswith("__"):
+                        fil.write("\n")
+                        if prop.desc:
+                            fil.write("\t/** %s **/\n" % prop.desc)
+                        fil.write("\t%s%s,\n" % (prop.name, " = %s" % prop.def_val if prop.def_val else ""))
+
+                fil.write("}\n")
+                continue
+
+            if item.is_generic:
+                fil.write("/** [Generic] **/\n")
 
             interfaces = "implements %s " % ", ".join(item.interfaces) if item.interfaces else ""
             baseclass = "extends %s " % item.base_class if item.base_class else ""

@@ -3,15 +3,15 @@ import { ArgumentException } from "../exceptions";
 
 describe("Enum", () => {
     enum ExampleEnum {
-        FOO = "foo",
-        BAR = "bar",
-        BAZ = "baz"
+        FOO = 3,
+        BAR = 345,
+        BAZ = 93
     }
 
     it("should parse enum values correctly", () => {
-        expect(Enum.parse(ExampleEnum, "foo")).toBe(ExampleEnum.FOO);
-        expect(Enum.parse(ExampleEnum, "bar")).toBe(ExampleEnum.BAR);
-        expect(Enum.parse(ExampleEnum, "baz")).toBe(ExampleEnum.BAZ);
+        expect(Enum.parse(ExampleEnum, "FOO")).toBe(ExampleEnum.FOO);
+        expect(Enum.parse(ExampleEnum, "BAR")).toBe(ExampleEnum.BAR);
+        expect(Enum.parse(ExampleEnum, "BAZ")).toBe(ExampleEnum.BAZ);
     });
 
     it("should throw an exception when parsing an invalid string", () => {
@@ -25,7 +25,7 @@ describe("Enum", () => {
     });
 
     it("should throw an exception when converting an invalid value", () => {
-        expect(() => Enum.toString(ExampleEnum, "invalid")).toThrow(ArgumentException);
+        expect(() => Enum.toString(ExampleEnum, 0)).toThrow(ArgumentException);
     });
 
     it("should return an array of enum values when calling getValues()", () => {
