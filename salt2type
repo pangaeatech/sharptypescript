@@ -33,7 +33,7 @@ SOFTWARE.
 import os, re, sys
 from xml.etree import ElementTree
 from dataclasses import dataclass
-from typing import List, Tuple, Optional, TextIO
+from typing import List, Tuple, Optional, TextIO, Set
 
 #############
 ### TYPES ###
@@ -58,6 +58,9 @@ class PropDef:
 
     is_rest: Optional[bool] = None
     """ Whether or not this is a rest parameter (None if unknown). """
+
+    is_static: Optional[bool] = None
+    """ Whether or not this method is static (None if unknown). """
 
 
 @dataclass
@@ -131,20 +134,30 @@ class ClassDef:
     is_enum: Optional[bool] = None
     """ Whether or not this class should be treated as an enum (None if unknown). """
 
+    is_abstract: Optional[bool] = None
+    """ Whether or not this class is abstract (None if unknown). """
+
 
 ######################
 ### Helper Methods ###
 ######################
 
 
-def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
+def read_js(filename: str, ignfile: Optional[str]) -> Tuple[str, List[ClassDef], List[str]]:
     """
     Reads in the Script# file specified by the given filename and returns its parsed contents.
 
     @param filename: The JS file to read from
+    @param ignfile: The ignore file to read from (if applicable)
     @return: The name to pass to "ss.initAssembly" followed by all of the class definitions found in the file, followed by all of the global
         statements to execute.
     """
+    if ignfile:
+        with open(ignfile, "r") as fil:
+            ignlist = {i.strip() for i in fil.read().splitlines()}
+    else:
+        ignlist = set()
+
     with open(filename, "r") as fil:
         lines = fil.read().splitlines()
 
@@ -161,9 +174,14 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
         if line in ("\ufeff(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startswith("\tss.setMetadata("):
             pass
 
+        elif match := re.match(r"^\tglobal\.(.*) = (.*);$", line):
+            # single-line global assignments
+            if match.group(1) not in ignlist and match.group(2) not in ignlist:
+                globs.append(clean_line(line))
+
         elif re.match(r"^\tglobal\..*;$", line):
             # single-line global directives
-            globs.append(line)
+            globs.append(clean_line(line))
 
         elif re.match(r"^\t(.*)\.\$ctor1\.prototype = \1\.prototype;$", line) or re.match(
             r"^\t(.*)\.\$ctor\d\.prototype = \1\.\$ctor\d\.prototype = .*\.prototype;$", line
@@ -174,7 +192,8 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
         elif match := re.match(r"^\t(global|\$\.fn)\..*\{$", line):
             # multi-line global directives
             end_line = re_find_index(r"^\t\}", lines, i + 1)
-            globs.extend(lines[i : end_line + 1])
+            for inner in lines[i : end_line + 1]:
+                globs.append(clean_line(inner))
             i = end_line
 
         elif match := re.match(r"^\tss\.initAssembly\(\$asm, '(.*)'\);$", line):
@@ -194,7 +213,11 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             # Class constructor
             var_id = match.group(1)
             curr_class.var_id = var_id
-            classes[var_id] = curr_class
+            if "%s.%s" % (curr_class.namespace, curr_class.name) not in ignlist:
+                classes[var_id] = curr_class
+            else:
+                ignlist.add(var_id)
+
             params = []
             for prop in match.group(2).split(", "):
                 if prop:
@@ -210,7 +233,7 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
             and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = function\((.*)\) \{$" % re.escape(curr_class.var_id), line))
         ):
             end_line = re_find_index(r"^\t\};$", lines, i + 1)
-            # Class method
+            # static class method
 
             params = []
             type_params = None
@@ -229,76 +252,86 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
                     if prop:
                         params.append(PropDef(prop))
 
-            curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, None, type_params))
+            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in ignlist:
+                curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, True, type_params))
+
             i = end_line
 
         elif curr_class and curr_class.var_id and (match := re.match(r"^\t%s\.([A-Za-z0-9$_]+) = (.*);$" % re.escape(curr_class.var_id), line)):
-            # Class property
-            curr_class.props.append(PropDef(match.group(1), match.group(2)))
+            # static class property
+            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in ignlist:
+                curr_class.props.append(PropDef(match.group(1), match.group(2), None, None, None, True))
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{$", line):
             # Class multi-line definition
-            tmp_class = classes[match.group(1)]
-
+            tmp_class = classes.get(match.group(1))
             end_line = re_find_index(r"^\t\}", lines, i + 1)
-            add_props(tmp_class, lines[i + 1 : end_line], r"\t\t")
 
-            final = lines[end_line]
-            if final == "\t});":
-                pass
-            elif inner := re.match(r"^\t\}, ([^, ]+)\);$", final):
-                tmp_class.base_class = inner.group(1)
-            elif inner := re.match(r"^\t\}, null, \[(.*)\]\);$", final):
-                tmp_class.interfaces.extend(inner.group(1).split(", "))
-            elif inner := re.match(r"^\t\}, ([^, ]+), \[(.*)\]\);$", final):
-                tmp_class.base_class = inner.group(1)
-                tmp_class.interfaces.extend(inner.group(2).split(", "))
-            else:
-                raise Exception("Unsupported initClass multi-line ending: %s" % final)
+            if tmp_class:
+                add_props(tmp_class, lines[i + 1 : end_line], r"\t\t", ignlist)
+
+                final = lines[end_line]
+                if final == "\t});":
+                    pass
+                elif inner := re.match(r"^\t\}, ([^, ]+)\);$", final):
+                    tmp_class.base_class = inner.group(1)
+                elif inner := re.match(r"^\t\}, null, \[(.*)\]\);$", final):
+                    tmp_class.interfaces.extend(inner.group(1).split(", "))
+                elif inner := re.match(r"^\t\}, ([^, ]+), \[(.*)\]\);$", final):
+                    tmp_class.base_class = inner.group(1)
+                    tmp_class.interfaces.extend(inner.group(2).split(", "))
+                else:
+                    raise Exception("Unsupported initClass multi-line ending: %s" % final)
 
             i = end_line
 
         elif match := re.match(r"^\tss\.initClass\((.*), \$asm, \{(.*)\}(.*)\);$", line):
             # Class single-line definition
-            tmp_class = classes[match.group(1)]
-            add_props(tmp_class, match.group(2).strip().split(", "), r"")
+            tmp_class = classes.get(match.group(1))
 
-            final = match.group(3)
-            if final == "":
-                pass
-            elif inner := re.match(r"^, ([^, ]+)$", final):
-                tmp_class.base_class = inner.group(1)
-            elif inner := re.match(r"^, null, \[(.*)\]$", final):
-                tmp_class.interfaces.extend(inner.group(1).split(", "))
-            elif inner := re.match(r"^, ([^, ]+), \[(.*)\]$", final):
-                tmp_class.base_class = inner.group(1)
-                tmp_class.interfaces.extend(inner.group(2).split(", "))
-            else:
-                raise Exception("Unsupported initClass single-line ending: %s" % final)
+            if tmp_class:
+                add_props(tmp_class, match.group(2).strip().split(", "), r"", ignlist)
+
+                final = match.group(3)
+                if final == "":
+                    pass
+                elif inner := re.match(r"^, ([^, ]+)$", final):
+                    tmp_class.base_class = inner.group(1)
+                elif inner := re.match(r"^, null, \[(.*)\]$", final):
+                    tmp_class.interfaces.extend(inner.group(1).split(", "))
+                elif inner := re.match(r"^, ([^, ]+), \[(.*)\]$", final):
+                    tmp_class.base_class = inner.group(1)
+                    tmp_class.interfaces.extend(inner.group(2).split(", "))
+                else:
+                    raise Exception("Unsupported initClass single-line ending: %s" % final)
 
         elif match := re.match(r"^\tss\.initInterface\((.*), \$asm, \{(.*)\}(.*)\);$", line):
             # Interface definition
-            tmp_class = classes[match.group(1)]
-            add_props(tmp_class, match.group(2).strip().split(", "), r"")
+            tmp_class = classes.get(match.group(1))
 
-            final = match.group(3)
-            if final == "":
-                pass
-            elif inner := re.match(r"^, \[(.*)\]$", final):
-                tmp_class.interfaces.extend(inner.group(1).split(", "))
-            else:
-                raise Exception("Unsupported initInterface ending: %s" % final)
+            if tmp_class:
+                add_props(tmp_class, match.group(2).strip().split(", "), r"", ignlist)
+
+                final = match.group(3)
+                if final == "":
+                    pass
+                elif inner := re.match(r"^, \[(.*)\]$", final):
+                    tmp_class.interfaces.extend(inner.group(1).split(", "))
+                else:
+                    raise Exception("Unsupported initInterface ending: %s" % final)
 
         elif match := re.match(r"^\tss\.initGeneric(Class|Interface)\((.*), \$asm, ([1-9][0-9]*)\);$", line):
             # Generic definition
-            tmp_class = classes[match.group(2)]
-            tmp_class.is_generic = int(match.group(3))
+            tmp_class = classes.get(match.group(2))
+            if tmp_class:
+                tmp_class.is_generic = int(match.group(3))
 
         elif match := re.match(r"^\tss\.initEnum\((.*), \$asm, \{(.*)\}(, true)?\);$", line):
             # Enum definition
-            tmp_class = classes[match.group(1)]
-            add_props(tmp_class, match.group(2).strip().split(", "), r"")
-            tmp_class.is_enum = True
+            tmp_class = classes.get(match.group(1))
+            if tmp_class:
+                add_props(tmp_class, match.group(2).strip().split(", "), r"", ignlist)
+                tmp_class.is_enum = True
 
         elif line == "\t(function() {":
             # multi-line initialization functions
@@ -310,17 +343,21 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
                 if match := re.match(r"^\t\t([A-Za-z0-9$_]+)\.([A-Za-z0-9$_]+) = (\[[^\[]*\]|\"[^\"]*\"|'[^']*'|\{[^\}]*\}|[0-9.-]+|null);$", init):
                     tmp_class = classes.get(match.group(1))
                     if tmp_class:
-                        tmp_class.props.append(PropDef(match.group(2), match.group(3)))
-                    else:
-                        globs.append(init)
+                        tmp_class.props.append(PropDef(match.group(2), match.group(3), None, None, None, True))
+                    elif match.group(1) not in ignlist:
+                        globs.append(clean_line(init))
                 elif match := re.match(r"^\t\t([A-Za-z0-9$_]+)\.([A-Za-z0-9$_]+) = ", init):
                     tmp_class = classes.get(match.group(1))
                     if tmp_class:
-                        tmp_class.props.append(PropDef(match.group(2)))
+                        tmp_class.props.append(PropDef(match.group(2), None, None, None, None, True))
 
-                    globs.append(init)
+                    if match.group(1) not in ignlist:
+                        globs.append(clean_line(init))
+                elif match := re.match(r"^\t\t([A-Za-z0-9$_]+)\.", init):
+                    if match.group(1) not in ignlist:
+                        globs.append(clean_line(init))
                 else:
-                    globs.append(init)
+                    globs.append(clean_line(init))
 
             i = end_line
 
@@ -332,11 +369,21 @@ def read_js(filename: str) -> Tuple[str, List[ClassDef], List[str]]:
     return asm_name, classes.values(), globs
 
 
+def clean_line(line: str) -> str:
+    """
+    Prepares the specified line for typescript.
+    """
+    # Handle generic method calls
+    line = re.sub(r"\b([A-Za-z0-9$_]+)\(([^\(\)]+)\)\.call\(", lambda m: f"{m.group(1)}<{to_type(m.group(2))}>(", line)
+
+    return line
+
+
 def to_body(curr_class: ClassDef, lines: List[str]) -> List[str]:
     """
     Returns the specified method body formatted for inclusion inside the class.
     """
-    return [line.replace(curr_class.var_id, curr_class.name) for line in lines]
+    return [clean_line(line.replace(curr_class.var_id, curr_class.name)) for line in lines]
 
 
 def re_find_index(pattern: str, lines: List[str], start: int) -> int:
@@ -363,7 +410,7 @@ def to_text(node: Optional[ElementTree.Element]) -> str:
     return ""
 
 
-def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
+def add_props(curr_class: ClassDef, lines: List[str], prefix: str, ignlist: Set) -> None:
     """
     Adds the properties and methods specified in the given source to the
     specified class.  Uses the prefix to determine the current indentation
@@ -399,11 +446,13 @@ def add_props(curr_class: ClassDef, lines: List[str], prefix: str) -> None:
                     if prop:
                         params.append(PropDef(prop))
 
-            curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, None, type_params))
+            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in ignlist:
+                curr_class.methods.append(MethodDef(match.group(1), params, None, to_body(curr_class, body), None, None, None, type_params))
             i = end_line
         elif match := re.match(r"^%s(.*): (.*[^,]),?$" % prefix, line):
             # Property
-            curr_class.props.append(PropDef(match.group(1), match.group(2)))
+            if "%s.%s:%s" % (curr_class.namespace, curr_class.name, match.group(1)) not in ignlist:
+                curr_class.props.append(PropDef(match.group(1), match.group(2)))
         else:
             raise Exception("Unsupported inner class line: %s" % line)
 
@@ -419,13 +468,15 @@ def to_type(raw_type: str) -> str:
 
     raw_type = re.sub(r"\bbool\b", "boolean", raw_type)
     raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
-    raw_type = re.sub(r"\bList\b", "Array", raw_type)
-    raw_type = re.sub(r"\bJsDictionary\b", "Dictionary", raw_type)
+    raw_type = re.sub(r"\b(ss\.)?(IList|List|IEnumerable|ICollection)\b", "Array", raw_type)
+    raw_type = re.sub(r"\b(ss\.)?JsDate\b", "Date", raw_type)
+    raw_type = re.sub(r"\bObject\b", "object", raw_type)
     raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
-    raw_type = re.sub(r"\bDelegate\b", "Action", raw_type)
-
-    raw_type = re.sub(r"^delegate (.*)$", r"Action< \1 >", raw_type)
+    raw_type = re.sub(r"\bDelegate\b", "Action<void>", raw_type)
+    raw_type = re.sub(r"^delegate (.*)$", r"Action<\1>", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary<", r"Record<", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<)", r"Record<string,unknown>\1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
     if optional:
@@ -451,11 +502,12 @@ def read_doc(filename: str) -> List[ClassDef]:
             key = compound.find("compoundname").text.replace("::", ".")
             [namespace, name] = key.rsplit(".", 1)
             doc_id = compound.get("id")
+            is_abstract = compound.get("abstract") == "yes"
             methods = []
             props = []
             links = []
 
-            classes[key] = ClassDef(namespace, name, doc_id, methods, props, links, None, None, [], 0)
+            classes[key] = ClassDef(namespace, name, doc_id, methods, props, links, None, None, [], 0, None, is_abstract)
 
             for member in compound.findall("./sectiondef/memberdef"):
                 kind = member.get("kind")
@@ -550,6 +602,7 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
 
         if curr_class:
             curr_class.doc_id = typ.doc_id
+            curr_class.is_abstract = typ.is_abstract
 
             for method in typ.methods:
                 curr_method = find_method(curr_class.methods, method.name, len(method.params))
@@ -627,7 +680,8 @@ def prop_to_string(prop: PropDef) -> str:
     """
     defval = " = %s" % prop.def_val if prop.def_val else ""
     typstr = ": %s" % (prop.typ or "any") if not defval or prop.typ else ""
-    return "%s%s%s%s" % ("..." if prop.is_rest else "", prop.name, typstr, defval)
+    prefix = "..." if prop.is_rest else ("static " if prop.is_static else "")
+    return "%s%s%s%s" % (prefix, prop.name, typstr, defval)
 
 
 def find_class(link: str, defs: List[ClassDef]) -> Optional[ClassDef]:
@@ -662,7 +716,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
 
             interfaces = "implements %s " % ", ".join(item.interfaces) if item.interfaces else ""
             baseclass = "extends %s " % item.base_class if item.base_class else ""
-            fil.write("export default class %s %s%s{\n" % (item.name, baseclass, interfaces))
+            fil.write("export default %sclass %s %s%s{\n" % ("abstract " if item.is_abstract else "", item.name, baseclass, interfaces))
 
             for prop in item.props:
                 fil.write("\n")
@@ -698,8 +752,7 @@ def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_
         if item.var_id and item.var_id != ignore_var_id:
             out_file.write("import %s from '%s/%s/%s';\n" % (item.var_id, go_up, item.namespace.replace(".", "/"), item.name))
 
-    out_file.write("import { Dictionary } from '%s/types';\n" % go_up)
-    out_file.write("declare var ss: any;\n")
+    out_file.write("import * as ss from '%s/ss';\n" % go_up)
 
 
 def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
@@ -723,12 +776,12 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
 ###################
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME" % sys.argv[0])
+    if len(sys.argv) < 5 or len(sys.argv) > 6:
+        raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME [BLFILE]" % sys.argv[0])
 
-    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME] = sys.argv  # pylint: disable=unbalanced-tuple-unpacking
+    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME, BL_FILE] = (sys.argv + [None])[:6]  # pylint: disable=unbalanced-tuple-unpacking
 
-    ASM_NAME, CLASSES, GLOBALS = read_js(JS_FILE)
+    ASM_NAME, CLASSES, GLOBALS = read_js(JS_FILE, BL_FILE)
     TYPES = read_doc(XML_FILE)
     add_doc_info(CLASSES, TYPES)
 
