@@ -21,7 +21,6 @@
     "sourceType": "module"
   },
   "plugins": ["@typescript-eslint", "import", "unused-imports"],
-  "ignorePatterns": ["*.min.js"],
   "rules": {
     "@typescript-eslint/adjacent-overload-signatures": "off",
     "@typescript-eslint/no-empty-function": "off",
