@@ -3,6 +3,7 @@ import { v4 as newGuid } from "uuid";
 export { default as StringBuilder } from "./StringBuilder";
 export { default as Stopwatch } from "./Stopwatch";
 export { default as TimeSpan } from "./TimeSpan";
+export { default as Enum } from "./Enum";
 
 export { JsDate, utcNow, toUTC, fromUTC, today, formatDate, netFormatDate } from "./dates";
 export { formatNumber, round, unbox, Nullable$1, NumberFormatInfo, compare, Int32, netFormatNumber } from "./numbers";
