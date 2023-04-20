@@ -621,6 +621,9 @@ def read_doc(filename: str, add_vars: Callable[[str, str, str], str]) -> Union[L
 def find_prop(items: List[PropDef], name: str) -> Optional[PropDef]:
     """
     Finds the specified property by name (if it exists in the specified list.
+
+    @param items: The property definitions (from JS)
+    @param name: The name (from XML)
     """
     for item in items:
         if item.name.lower() == name.lower():
@@ -659,8 +662,8 @@ def add_doc_info(defs: List[ClassDef], types: Union[List[ClassDef], str]) -> Non
     """
     Updates the class definitions found in C{defs} to specify all of the documentation details found in C{types}.
 
-    @param defs: The class definitions to modify in-place to add type definitions.
-    @param types: The type definitions to use for lookup.
+    @param defs: The class definitions (from JS) to modify in-place to add type definitions.
+    @param types: The type definitions (from XML) to use for lookup.
     """
     classes = {}  # { `${namespace}.${name}`: ClassDef }
     for curr_class in defs:
@@ -725,7 +728,13 @@ def add_doc_info(defs: List[ClassDef], types: Union[List[ClassDef], str]) -> Non
                         else:
                             def_val = None
 
-                        curr_class.props.append(PropDef(prop.name, def_val, prop.typ, prop.desc))
+                        char1 = prop.name[0]
+                        if char1 in ("_", char1.lower()):
+                            prop_name = "$" + prop.name
+                        else:
+                            prop_name = char1.lower() + prop.name[1:]
+
+                        curr_class.props.append(PropDef(prop_name, def_val, prop.typ, prop.desc))
 
                 curr_class.links.extend(typ.links)
 
