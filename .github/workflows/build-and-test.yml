@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build-and-test:
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft && !startsWith(github.event.pull_request.title, 'WIP ')) }}
     runs-on: ubuntu-latest
 
     steps:
