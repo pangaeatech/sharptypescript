@@ -38,6 +38,8 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version-file: ".nvmrc"
+          cache: "npm"
+          cache-dependency-path: "tpl/package-lock.json"
 
       - run: npm install
         working-directory: tpl
