@@ -86,7 +86,6 @@ export function delegateClone(source: Delegate): Delegate {
     return _mkdel([...source._targets]);
 }
 
-/* eslint-disable-next-line @typescript-eslint/ban-types */
 export function thisFix<T extends Function>(source: T): T {
     return function () {
         var x: any[] = [null];

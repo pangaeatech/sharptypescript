@@ -172,8 +172,6 @@ export function isAssignableFrom<T1, T2>(target: Type<T1>, typ: Type<T2>): boole
     return referenceEquals(target, typ) || typ.prototype instanceof target;
 }
 
-/* eslint-disable @typescript-eslint/ban-types */
-
 export function getDefaultValue<T>(typ: Type<T>): T | null {
     if (referenceEquals(typ, Boolean)) {
         return false as unknown as T;
@@ -213,8 +211,6 @@ export function createInstance<T>(typ: Type<T>): T {
 
     return new typ();
 }
-
-/* eslint-enable @typescript-eslint/ban-types */
 
 export function getInstanceType<T>(instance: T | null): Type<T> {
     if (!instance) {
