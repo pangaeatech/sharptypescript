@@ -171,7 +171,7 @@ def read_js(filename: str, ignfile: Optional[str]) -> Tuple[str, List[ClassDef],
     while i < len(lines):
         line = lines[i]
 
-        if line in ("\ufeff(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startswith("\tss.setMetadata("):
+        if line in ("(function() {", "\ufeff(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startswith("\tss.setMetadata("):
             pass
 
         elif match := re.match(r"^\tglobal\.(.*) = (.*);$", line):
