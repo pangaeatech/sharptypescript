@@ -476,7 +476,7 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"\bDelegate\b", "Action<void>", raw_type)
     raw_type = re.sub(r"^delegate (.*)$", r"Action<\1>", raw_type)
     raw_type = re.sub(r"(ss\.)?(Js)?Dictionary\<", r"Record<", raw_type)
-    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,unknown>1", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,unknown>\1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
     if optional:
