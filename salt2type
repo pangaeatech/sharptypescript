@@ -683,12 +683,13 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
                 dst_file = os.path.join(dst_dir, fil)
                 copy_file(src_file, dst_file, asm_name, ns_name)
 
+
 def to_local_prop(name: str) -> str:
     """
     Converts a C# local property to a S# name
     """
     if name[:1] == name[:1].lower():
-        return "$" + name;
+        return "$" + name
 
     return name[:1].lower() + name[1:]
 
