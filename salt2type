@@ -715,7 +715,7 @@ def find_class(link: str, defs: List[ClassDef]) -> Optional[ClassDef]:
     return None
 
 
-def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
+def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]] = None) -> None:
     """
     Generates the typescript files for each known class in the specified output directory.
 
@@ -728,7 +728,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
             os.makedirs(dst_dir)
 
         with open(os.path.join(dst_dir, "%s.ts" % item.name), "w") as fil:
-            write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id)
+            write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id, extra_imports)
             fil.write("\n")
 
             if item.is_generic or item.is_enum:
@@ -762,7 +762,9 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
             fil.write("}\n")
 
 
-def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_var_id: Optional[str] = None) -> None:
+def write_imports(
+    defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_var_id: Optional[str] = None, extra_imports: Optional[List[str]] = None
+) -> None:
     """Writes all imports to the specified output stream except the specified ignore item"""
     out_file.write("import Enumerable from 'linq';\n")
 
@@ -774,8 +776,12 @@ def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_
 
     out_file.write("import * as ss from '%s/ss';\n" % go_up)
 
+    if extra_imports:
+        for extra in extra_imports:
+            out_file.write("%s\n" % extra.replace("{MAINDIR}", go_up))
 
-def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
+
+def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_imports: Optional[List[str]] = None) -> None:
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
@@ -784,7 +790,7 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
     @param globs: The global method lines
     """
     with open(os.path.join(out_dir, "src", "index.ts"), "w") as fil:
-        write_imports(defs, fil, "")
+        write_imports(defs, fil, "", "", extra_imports)
 
         fil.write("\n")
         for glob in globs:
@@ -797,14 +803,20 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) < 5 or len(sys.argv) > 6:
-        raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME [BLFILE]" % sys.argv[0])
+        raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME [IGNFILE] [IMPORTS]" % sys.argv[0])
 
-    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME, BL_FILE] = (sys.argv + [None])[:6]  # pylint: disable=unbalanced-tuple-unpacking
+    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME, BL_FILE, IMPORTS] = (sys.argv + [None, None])[:7]  # pylint: disable=unbalanced-tuple-unpacking
 
     ASM_NAME, CLASSES, GLOBALS = read_js(JS_FILE, BL_FILE)
     TYPES = read_doc(XML_FILE)
     add_doc_info(CLASSES, TYPES)
 
+    if IMPORTS:
+        with open(IMPORTS, "r") as imp_fil:
+            EXTRA_IMPORTS = imp_fil.read().splitlines()
+    else:
+        EXTRA_IMPORTS = None
+
     copy_tpl(OUT_DIR, ASM_NAME, NS_NAME)
-    gen_ts(OUT_DIR, CLASSES)
-    gen_index(OUT_DIR, CLASSES, GLOBALS)
+    gen_ts(OUT_DIR, CLASSES, EXTRA_IMPORTS)
+    gen_index(OUT_DIR, CLASSES, GLOBALS, EXTRA_IMPORTS)
