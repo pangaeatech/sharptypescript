@@ -762,7 +762,9 @@ def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]
             fil.write("}\n")
 
 
-def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_var_id: Optional[str] = None, extra_imports: Optional[List[str]] = None) -> None:
+def write_imports(
+    defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_var_id: Optional[str] = None, extra_imports: Optional[List[str]] = None
+) -> None:
     """Writes all imports to the specified output stream except the specified ignore item"""
     out_file.write("import Enumerable from 'linq';\n")
 
