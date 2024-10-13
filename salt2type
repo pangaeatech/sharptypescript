@@ -479,6 +479,9 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,unknown>\1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
+    if raw_type == "string":
+        optional = True
+
     if optional:
         return "%s | undefined | null" % raw_type
 
