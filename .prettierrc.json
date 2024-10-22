@@ -1,0 +1,21 @@
+{
+  "trailingComma": "none",
+  "tabWidth": 4,
+  "semi": true,
+  "printWidth": 120,
+  "overrides": [
+    {
+      "files": ["*.json", "*.yaml", "*.yml"],
+      "options": {
+        "tabWidth": 2
+      }
+    },
+    {
+      "files": [".whitesource", ".lintstagedrc"],
+      "options": {
+        "parser": "json",
+        "tabWidth": 2
+      }
+    }
+  ]
+}

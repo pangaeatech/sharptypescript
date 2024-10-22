@@ -1,9 +1,9 @@
-import { isValue, isNullOrUndefined } from "./index";
+import { isValue } from "./index";
 import { formatString, startsWithString, padLeftString } from "./strings";
 
 /** Formats the specified number using the format string. */
-export function formatNumber(n: number, format: string): string {
-    if (isNullOrUndefined(format) || format.length == 0 || format == "i") {
+export function formatNumber(n: number, format?: string | null): string {
+    if (!format || format == "i") {
         return n.toString();
     }
 
@@ -158,10 +158,11 @@ function _commaFormatNumber(num, groups, decimal, comma) {
     return decimalPart ? s + decimalPart : s;
 }
 
-export function netFormatNumber(num: number, format: string): string {
+export function netFormatNumber(num: number, format?: string | null): string {
     var s = "";
     var precision = -1;
 
+    format = format || "";
     if (format.length > 1) {
         precision = parseInt(format.substr(1), 10);
     }
