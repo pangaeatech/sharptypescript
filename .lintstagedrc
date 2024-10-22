@@ -1,0 +1,5 @@
+{
+  "salt2type": "poetry run black",
+  "*.py": "poetry run black",
+  "!(*.py,salt2type)": "prettier --ignore-unknown --write"
+}

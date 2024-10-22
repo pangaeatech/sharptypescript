@@ -56,9 +56,10 @@ jobs:
           cache-dependency-path: "tpl/package-lock.json"
 
       - run: npm install
-        working-directory: tpl
 
-      - run: npx prettier --check ..
+      - run: npm run jformat:check
+
+      - run: npm install
         working-directory: tpl
 
       - run: npm run lint
