@@ -25,7 +25,7 @@ export default class StringBuilder {
         return this.append(String.fromCharCode(c));
     }
 
-    appendLine(s: string | undefined | null): StringBuilder {
+    appendLine(s?: string | null): StringBuilder {
         this.append(s || "");
         this.append("\r\n");
         return this;
