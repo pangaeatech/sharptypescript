@@ -23,7 +23,12 @@ export function regexpEscape(s: string | undefined | null): string {
     return (s || "").replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }
 
-export function netSplit(s: string | undefined | null, strings: Array<string | undefined | null>, limit: number, options?: number): string[] {
+export function netSplit(
+    s: string | undefined | null,
+    strings: Array<string | undefined | null>,
+    limit: number,
+    options?: number
+): string[] {
     s = s || "";
     const re = new RegExp(strings.map(regexpEscape).join("|"), "g");
     const res: string[] = [];
@@ -93,7 +98,7 @@ export function endsWithString(value: string | undefined | null, suffix: string 
 export function stringFromChar(ch: string | undefined | null, count: number): string {
     var s = ch || "";
     for (var i = 1; i < count; i++) {
-        s += (ch || "");
+        s += ch || "";
     }
     return s;
 }
@@ -150,7 +155,11 @@ export function padRightString(s: string | undefined | null, totalWidth: number,
     return s;
 }
 
-export function replaceAllString(s: string | undefined | null, oldValue: string | undefined | null, newValue: string | undefined | null): string {
+export function replaceAllString(
+    s: string | undefined | null,
+    oldValue: string | undefined | null,
+    newValue: string | undefined | null
+): string {
     return (s || "").split(oldValue || "").join(newValue || "");
 }
 
