@@ -1,9 +1,9 @@
-import { isValue, isNullOrUndefined } from "./index";
+import { isValue } from "./index";
 import { formatString, startsWithString, padLeftString } from "./strings";
 
 /** Formats the specified number using the format string. */
 export function formatNumber(n: number, format?: string | null): string {
-    if (isNullOrUndefined(format) || format.length == 0 || format == "i") {
+    if (!format || format == "i") {
         return n.toString();
     }
 
