@@ -775,10 +775,14 @@ def write_imports(
     out_file.write("import Enumerable from 'linq';\n")
 
     go_up = re.sub(r"[^\/]+", "..", curr_dir) or "."
+    donelist = []
 
     for item in defs:
         if item.var_id and item.var_id != ignore_var_id:
             out_file.write("import %s from '%s/%s/%s';\n" % (item.var_id, go_up, item.namespace.replace(".", "/"), item.name))
+        if item.name not in donelist:
+            out_file.write("import %s from '%s/%s/%s';\n" % (item.name, go_up, item.namespace.replace(".", "/"), item.name))
+            donelist.append(item.name)
 
     out_file.write("import * as ss from '%s/ss';\n" % go_up)
 
