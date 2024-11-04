@@ -700,11 +700,20 @@ def to_local_prop(name: str) -> str:
     return name[:1].lower() + name[1:]
 
 
-def prop_to_string(prop: PropDef) -> str:
+def prop_to_string(prop: PropDef, alwaysDef: Optional[bool] = False) -> str:
     """
     Generates a stringified version of the property for typescript
     """
-    defval = " = %s" % prop.def_val if prop.def_val else ""
+    myval = prop.def_val
+    if alwaysDef and not myval:
+        if prop.typ == "boolean":
+            myval = "false"
+        elif prop.type == "number":
+            myval = "0"
+        else:
+            myval = "null"
+
+    defval = " = %s" % myval if myval else ""
     typstr = ": %s" % (prop.typ or "any") if not defval or prop.typ else ""
     prefix = "..." if prop.is_rest else ("static " if prop.is_static else "")
     return "%s%s%s%s" % (prefix, prop.name, typstr, defval)
@@ -748,7 +757,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]
                 fil.write("\n")
                 if prop.desc:
                     fil.write("\t/** %s **/\n" % prop.desc)
-                fil.write("\t%s;\n" % prop_to_string(prop))
+                fil.write("\t%s;\n" % prop_to_string(prop, True))
 
             for method in item.methods:
                 fil.write("\n")
