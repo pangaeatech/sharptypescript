@@ -708,7 +708,7 @@ def prop_to_string(prop: PropDef, alwaysDef: Optional[bool] = False) -> str:
     if alwaysDef and not myval:
         if prop.typ == "boolean":
             myval = "false"
-        elif prop.type == "number":
+        elif prop.typ == "number":
             myval = "0"
         else:
             myval = "null"
