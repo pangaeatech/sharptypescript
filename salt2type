@@ -482,7 +482,7 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,unknown>\1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
-    if raw_type == "string":
+    if raw_type == "string" or raw_type == "object":
         optional = True
 
     if optional:
@@ -710,6 +710,8 @@ def prop_to_string(prop: PropDef, alwaysDef: Optional[bool] = False) -> str:
             myval = "false"
         elif prop.typ == "number":
             myval = "0"
+        elif prop.typ and prop.typ.endswith("[]"):
+            myval = "[]"
         else:
             myval = "null"
 
@@ -743,7 +745,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]
             os.makedirs(dst_dir)
 
         with open(os.path.join(dst_dir, "%s.ts" % item.name), "w") as fil:
-            write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id, extra_imports)
+            write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id, item.name, extra_imports)
             fil.write("\n")
 
             if item.is_generic or item.is_enum:
@@ -751,7 +753,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]
 
             interfaces = "implements %s " % ", ".join(item.interfaces) if item.interfaces else ""
             baseclass = "extends %s " % item.base_class if item.base_class else ""
-            fil.write("export default %sclass %s %s%s{\n" % ("abstract " if item.is_abstract else "", item.name, baseclass, interfaces))
+            fil.write("%sclass %s %s%s{\n" % ("abstract " if item.is_abstract else "", item.name, baseclass, interfaces))
 
             for prop in item.props:
                 fil.write("\n")
@@ -776,9 +778,17 @@ def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]
 
             fil.write("}\n")
 
+            fil.write("\n")
+            fil.write("export default %s;" % item.name)
+
 
 def write_imports(
-    defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_var_id: Optional[str] = None, extra_imports: Optional[List[str]] = None
+    defs: List[ClassDef],
+    out_file: TextIO,
+    curr_dir: str,
+    ignore_var_id: Optional[str] = None,
+    ignore_name: Optional[str] = None,
+    extra_imports: Optional[List[str]] = None,
 ) -> None:
     """Writes all imports to the specified output stream except the specified ignore item"""
     out_file.write("import Enumerable from 'linq';\n")
@@ -789,7 +799,7 @@ def write_imports(
     for item in defs:
         if item.var_id and item.var_id != ignore_var_id:
             out_file.write("import %s from '%s/%s/%s';\n" % (item.var_id, go_up, item.namespace.replace(".", "/"), item.name))
-        if item.name not in donelist:
+        if item.name not in donelist and item.name != ignore_name:
             out_file.write("import %s from '%s/%s/%s';\n" % (item.name, go_up, item.namespace.replace(".", "/"), item.name))
             donelist.append(item.name)
 
@@ -809,7 +819,7 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_import
     @param globs: The global method lines
     """
     with open(os.path.join(out_dir, "src", "index.ts"), "w") as fil:
-        write_imports(defs, fil, "", "", extra_imports)
+        write_imports(defs, fil, "", "", "", extra_imports)
 
         fil.write("\n")
         for glob in globs:

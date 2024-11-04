@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": "./src/",
-    "rootDir": "./src/",
+    "rootDir": "./",
     "outDir": "./dist/",
     "noImplicitAny": false,
     "module": "es6",
@@ -12,5 +12,5 @@
     "moduleResolution": "node",
     "strict": true
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }
