@@ -604,8 +604,8 @@ def add_doc_info(defs: List[ClassDef], types: List[ClassDef]) -> None:
     """
     Updates the class definitions found in C{defs} to specify all of the documentation details found in C{types}.
 
-    @param defs: The class definitions to modify in-place to add type definitions.
-    @param types: The type definitions to use for lookup.
+    @param defs: The class definitions (from JS) to modify in-place to add type definitions.
+    @param types: The type definitions (from XML) to use for lookup.
     """
     classes = {}  # key = `${namespace}.${name}`, value = ClassDef
     for curr_class in defs:
@@ -722,8 +722,10 @@ def prop_to_string(prop: PropDef, always_def: Optional[bool] = False) -> str:
             myval = "false"
         elif prop.typ == "number":
             myval = "0"
+        elif prop.type == "Date":
+            myval = "new Date(0)"
         elif prop.typ == "string":
-            myval = "''"
+            myval = '""'
         elif prop.typ.endswith("[]"):
             myval = "[]"
         elif prop.typ.startswith("Array<") and prop.typ.endswith(">"):
@@ -772,8 +774,22 @@ def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]
             write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id, item.name, extra_imports)
             fil.write("\n")
 
-            if item.is_generic or item.is_enum:
-                fil.write("/** %s%s **/\n" % ("[Generic]" if item.is_generic else "", "[Enum]" if item.is_enum else ""))
+            if item.is_enum:
+                fil.write("enum %s {\n" % item.name)
+                for prop in item.props:
+                    if not prop.name.startswith("__"):
+                        fil.write("\n")
+                        if prop.desc:
+                            fil.write("\t/** %s **/\n" % prop.desc)
+                        fil.write("\t%s%s,\n" % (prop.name, " = %s" % prop.def_val if prop.def_val else ""))
+
+                fil.write("}\n")
+                fil.write("\n")
+                fil.write("export default %s\n" % item.name)
+                continue
+
+            if item.is_generic:
+                fil.write("/** [Generic] **/\n")
 
             interfaces = "implements %s " % ", ".join(item.interfaces) if item.interfaces else ""
             baseclass = "extends %s " % item.base_class if item.base_class else ""
