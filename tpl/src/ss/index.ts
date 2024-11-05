@@ -10,6 +10,8 @@ export { formatNumber, round, unbox, Nullable$1, NumberFormatInfo, compare, Int3
 export {
     Action,
     Delegate,
+    Func,
+    TypeOption,
     mkdel,
     delegateCombine,
     delegateRemove,
@@ -172,7 +174,7 @@ export function isAssignableFrom<T1, T2>(target: Type<T1>, typ: Type<T2>): boole
     return referenceEquals(target, typ) || typ.prototype instanceof target;
 }
 
-export function getDefaultValue<T>(typ: Type<T>): T | null {
+export function getDefaultValue<T>(typ: Type<T>): T | undefined {
     if (referenceEquals(typ, Boolean)) {
         return false as unknown as T;
     }
@@ -185,7 +187,7 @@ export function getDefaultValue<T>(typ: Type<T>): T | null {
         return 0 as unknown as T;
     }
 
-    return null;
+    return undefined;
 }
 
 export function createInstance<T>(typ: Type<T>): T {
@@ -212,7 +214,7 @@ export function createInstance<T>(typ: Type<T>): T {
     return new typ();
 }
 
-export function getInstanceType<T>(instance: T | null): Type<T> {
+export function getInstanceType<T>(instance?: T | null): Type<T> {
     if (!instance) {
         throw "Cannot get type of null";
     }

@@ -1,1 +1,6 @@
+/doc
+/.coverage
+/coverage
+/htmlcov
 node_modules
+__pycache__

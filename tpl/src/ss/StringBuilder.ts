@@ -2,10 +2,10 @@ export interface Stringable {
     toString: () => string;
 }
 
-export default class StringBuilder {
+class StringBuilder {
     private _parts: string[];
 
-    constructor(s?: string | null) {
+    constructor(s?: string) {
         if (s && s.length > 0) {
             this._parts = [s];
         } else {
@@ -14,7 +14,7 @@ export default class StringBuilder {
     }
 
     append(o: Stringable | null | undefined): StringBuilder {
-        if (o !== null && o != undefined) {
+        if (o !== null && o !== undefined) {
             this._parts.push(o.toString());
         }
 
@@ -25,7 +25,7 @@ export default class StringBuilder {
         return this.append(String.fromCharCode(c));
     }
 
-    appendLine(s?: string | null): StringBuilder {
+    appendLine(s?: string): StringBuilder {
         this.append(s || "");
         this.append("\r\n");
         return this;
@@ -43,3 +43,5 @@ export default class StringBuilder {
         return this._parts.join("");
     }
 }
+
+export default StringBuilder;
