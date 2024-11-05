@@ -722,7 +722,7 @@ def prop_to_string(prop: PropDef, always_def: Optional[bool] = False) -> str:
             myval = "false"
         elif prop.typ == "number":
             myval = "0"
-        elif prop.type == "Date":
+        elif prop.typ == "Date":
             myval = "new Date(0)"
         elif prop.typ == "string":
             myval = '""'
