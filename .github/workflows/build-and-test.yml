@@ -28,21 +28,38 @@ jobs:
           python-version-file: "pyproject.toml"
           cache: "pip"
 
-      - run: pip install -r requirements.txt
+      - name: Install poetry
+        uses: abatilo/actions-poetry@v2
 
-      - run: black --check .
+      - name: Set up local venv
+        run: |
+          poetry config virtualenvs.create true --local
+          poetry config virtualenvs.in-project true --local
 
-      - run: pylint salt2type
+      - name: Cache venv
+        uses: actions/cache@v3
+        with:
+          path: ./.venv
+          key: venv-${{ hashFiles('poetry.lock') }}
+
+      - run: poetry install
+
+      - run: poetry run black --check .
+
+      - run: poetry run pylint salt2type
 
       - name: Set up Node
         uses: actions/setup-node@v3
         with:
-          node-version-file: ".nvmrc"
+          node-version-file: "tpl/.nvmrc"
+          cache: "npm"
+          cache-dependency-path: "tpl/package-lock.json"
 
       - run: npm install
-        working-directory: tpl
 
-      - run: npx prettier --check ..
+      - run: npm run jformat:check
+
+      - run: npm install
         working-directory: tpl
 
       - run: npm run lint

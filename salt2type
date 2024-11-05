@@ -60,7 +60,7 @@ class PropDef:
     """ Whether or not this is a rest parameter (None if unknown). """
 
     is_static: Optional[bool] = None
-    """ Whether or not this method is static (None if unknown). """
+    """ Whether or not this property is static (None if unknown). """
 
 
 @dataclass
@@ -171,7 +171,7 @@ def read_js(filename: str, ignfile: Optional[str]) -> Tuple[str, List[ClassDef],
     while i < len(lines):
         line = lines[i]
 
-        if line in ("\ufeff(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startswith("\tss.setMetadata("):
+        if line in ("(function() {", "\ufeff(function() {", "\t'use strict';", "})();", "\tvar $asm = {};") or line.startswith("\tss.setMetadata("):
             pass
 
         elif match := re.match(r"^\tglobal\.(.*) = (.*);$", line):
@@ -373,6 +373,9 @@ def clean_line(line: str) -> str:
     """
     Prepares the specified line for typescript.
     """
+    # Handle generic static method calls
+    line = re.sub(r"\b([A-Za-z0-9$_]+)\(([^\(\)]+)\)\.call\(null,\s+", lambda m: f"{m.group(1)}<{to_type(m.group(2))}>(", line)
+
     # Handle generic method calls
     line = re.sub(r"\b([A-Za-z0-9$_]+)\(([^\(\)]+)\)\.call\(null, *", lambda m: f"{m.group(1)}<{to_type(m.group(2))}>(", line)
     line = re.sub(r"\bnull\b", "undefined", line)
@@ -477,10 +480,15 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"\bDateTime\b", "Date", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
     raw_type = re.sub(r"^delegate (.*)$", r"Action<\1>", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary\<", r"Record<", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,unknown>\1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
-    if raw_type in ("any", "unknown"):
-        return raw_type
+    if raw_type == "string":
+        optional = True
+
+    if optional:
+        return "%s | undefined | null" % raw_type
 
     if optional:
         return "%s | undefined" % raw_type
@@ -735,8 +743,10 @@ def add_doc_info(defs: List[ClassDef], types: Union[List[ClassDef], str]) -> Non
                             prop_name = char1.lower() + prop.name[1:]
 
                         curr_class.props.append(PropDef(prop_name, def_val, prop.typ, prop.desc))
+            elif not prop.name.startswith("this["):
+                curr_class.props.append(PropDef(to_local_prop(prop.name), None, prop.typ, prop.desc, prop.is_rest, False))
 
-                curr_class.links.extend(typ.links)
+            curr_class.links.extend(typ.links)
 
 
 def copy_file(in_file: str, out_file: str, asm_name: str, ns_name: str) -> None:
@@ -789,6 +799,16 @@ def copy_tpl(out_dir: str, asm_name: str, ns_name: str) -> None:
                 copy_file(src_file, dst_file, asm_name, ns_name)
 
 
+def to_local_prop(name: str) -> str:
+    """
+    Converts a C# local property to a S# name
+    """
+    if name[:1] == name[:1].lower():
+        return "$" + name
+
+    return name[:1].lower() + name[1:]
+
+
 def prop_to_string(prop: PropDef) -> str:
     """
     Generates a stringified version of the property for typescript
@@ -810,7 +830,7 @@ def find_class(link: str, defs: List[ClassDef]) -> Optional[ClassDef]:
     return None
 
 
-def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
+def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]] = None) -> None:
     """
     Generates the typescript files for each known class in the specified output directory.
 
@@ -823,7 +843,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
             os.makedirs(dst_dir)
 
         with open(os.path.join(dst_dir, "%s.ts" % item.name), "w") as fil:
-            write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id)
+            write_imports(defs, fil, item.namespace.replace(".", "/"), item.var_id, extra_imports)
             fil.write("\n")
 
             if item.is_enum:
@@ -871,7 +891,9 @@ def gen_ts(out_dir: str, defs: List[ClassDef]) -> None:
             fil.write("}\n")
 
 
-def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_var_id: Optional[str] = None) -> None:
+def write_imports(
+    defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_var_id: Optional[str] = None, extra_imports: Optional[List[str]] = None
+) -> None:
     """Writes all imports to the specified output stream except the specified ignore item"""
     out_file.write("import Enumerable from 'linq';\n")
 
@@ -884,8 +906,12 @@ def write_imports(defs: List[ClassDef], out_file: TextIO, curr_dir: str, ignore_
     out_file.write("import * as ss from '%s/ss';\n" % go_up)
     out_file.write("import { JsDictionary, Action, Delegate, Func, TypeOption } from '%s/types';\n" % go_up)
 
+    if extra_imports:
+        for extra in extra_imports:
+            out_file.write("%s\n" % extra.replace("{MAINDIR}", go_up))
 
-def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
+
+def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_imports: Optional[List[str]] = None) -> None:
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
@@ -894,7 +920,7 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
     @param globs: The global method lines
     """
     with open(os.path.join(out_dir, "src", "index.ts"), "w") as fil:
-        write_imports(defs, fil, "")
+        write_imports(defs, fil, "", "", extra_imports)
 
         fil.write("\n")
         for glob in globs:
@@ -906,16 +932,22 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str]) -> None:
 ###################
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5 or len(sys.argv) > 6:
-        raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME [BLFILE]" % sys.argv[0])
+    if len(sys.argv) < 5 or len(sys.argv) > 7:
+        raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME [IGNFILE] [IMPORTS]" % sys.argv[0])
 
-    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME, BL_FILE] = (sys.argv + [None])[:6]  # pylint: disable=unbalanced-tuple-unpacking
+    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME, BL_FILE, IMPORTS] = (sys.argv + [None, None])[:7]  # pylint: disable=unbalanced-tuple-unpacking
 
     ASM_NAME, CLASSES, GLOBALS = read_js(JS_FILE, BL_FILE)
     ADD_VARS = create_var_adder(CLASSES)
     TYPES = read_doc(XML_FILE, ADD_VARS)
     add_doc_info(CLASSES, TYPES)
 
+    if IMPORTS:
+        with open(IMPORTS, "r") as imp_fil:
+            EXTRA_IMPORTS = imp_fil.read().splitlines()
+    else:
+        EXTRA_IMPORTS = None
+
     copy_tpl(OUT_DIR, ASM_NAME, NS_NAME)
-    gen_ts(OUT_DIR, CLASSES)
-    gen_index(OUT_DIR, CLASSES, GLOBALS)
+    gen_ts(OUT_DIR, CLASSES, EXTRA_IMPORTS)
+    gen_index(OUT_DIR, CLASSES, GLOBALS, EXTRA_IMPORTS)
