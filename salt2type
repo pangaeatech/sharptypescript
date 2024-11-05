@@ -715,10 +715,14 @@ def prop_to_string(prop: PropDef, always_def: Optional[bool] = False) -> str:
             myval = "false"
         elif prop.typ == "number":
             myval = "0"
+        elif prop.typ == "string":
+            myval = "''"
         elif prop.typ.endswith("[]"):
             myval = "[]"
         elif prop.typ.startswith("Array<") and prop.typ.endswith(">"):
             myval = "[]"
+        elif "undefined" not in prop.typ:
+            myval = "{} as " + prop.typ
         else:
             myval = "undefined"
 
@@ -786,7 +790,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]
                 else:
                     fil.write("\tconstructor%s(%s) {\n" % (gen, props))
                 for line in method.body:
-                    fil.write("\t%s\n" % re.sub(r"\bnull\b", "undefined", line))
+                    fil.write("\t%s\n" % fix_body_line(line))
                 fil.write("\t}\n")
 
             fil.write("}\n")
@@ -823,6 +827,16 @@ def write_imports(
             out_file.write("%s\n" % extra.replace("{MAINDIR}", go_up))
 
 
+def fix_body_line(line: str) -> str:
+    """
+    Applies fixes to a body line of typescript code.
+    """
+    line = re.sub(r"\bnull\b", "undefined", line)
+    line = re.sub(r"^(\s*var [A-Za-z0-9$_]+) = [];\s*$", lambda m: f"{m.group(1)}: any[] = [];", line)
+
+    return line
+
+
 def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_imports: Optional[List[str]] = None) -> None:
     """
     Generates the index.ts file exporting each known class in the specified output directory.
@@ -836,7 +850,7 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_import
 
         fil.write("\n")
         for glob in globs:
-            fil.write("%s\n" % re.sub(r"\bnull\b", "undefined", glob))
+            fil.write("%s\n" % fix_body_line(glob))
 
 
 ###################
