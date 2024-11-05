@@ -54,7 +54,7 @@ jobs:
           poetry run coverage report --no-skip-covered --fail-under=10 src/*.py
           poetry run coverage html --no-skip-covered src/*.py
 
-      - name: poetry run pdoc -o doc src
+      - run: poetry run pdoc -o doc src
 
       - name: Set up Node
         uses: actions/setup-node@v3
