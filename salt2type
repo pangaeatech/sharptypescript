@@ -717,7 +717,7 @@ def prop_to_string(prop: PropDef, always_def: Optional[bool] = False) -> str:
             myval = "0"
         elif prop.typ.endswith("[]"):
             myval = "[]"
-        elif prop.typ.startswith("Array<") and prop.type.endswith(">"):
+        elif prop.typ.startswith("Array<") and prop.typ.endswith(">"):
             myval = "[]"
         else:
             myval = "undefined"
