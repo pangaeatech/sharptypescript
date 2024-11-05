@@ -709,11 +709,15 @@ def prop_to_string(prop: PropDef, alwaysDef: Optional[bool] = False) -> str:
     """
     myval = prop.def_val
     if alwaysDef and not myval:
-        if prop.typ == "boolean":
+        if not prop.typ:
+            myval = "undefined"
+        elif prop.typ == "boolean":
             myval = "false"
         elif prop.typ == "number":
             myval = "0"
-        elif prop.typ and prop.typ.endswith("[]"):
+        elif prop.typ.endswith("[]"):
+            myval = "[]"
+        elif prop.typ.startswith("Array<") and prop.type.endswith(">"):
             myval = "[]"
         else:
             myval = "undefined"
