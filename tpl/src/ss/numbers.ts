@@ -2,7 +2,7 @@ import { isValue } from "./index";
 import { formatString, startsWithString, padLeftString } from "./strings";
 
 /** Formats the specified number using the format string. */
-export function formatNumber(n: number, format?: string | null): string {
+export function formatNumber(n: number, format?: string): string {
     if (!format || format == "i") {
         return n.toString();
     }
@@ -54,12 +54,12 @@ export class Nullable$1 {
         return a !== undefined && b != undefined && a <= b;
     }
 
-    static add(a?: number, b?: number): number | null {
-        return a !== undefined && b != undefined ? a + b : null;
+    static add(a?: number, b?: number): number | undefined {
+        return a !== undefined && b != undefined ? a + b : undefined;
     }
 
-    static sub(a?: number, b?: number): number | null {
-        return a !== undefined && b != undefined ? a - b : null;
+    static sub(a?: number, b?: number): number | undefined {
+        return a !== undefined && b != undefined ? a - b : undefined;
     }
 }
 
@@ -101,10 +101,10 @@ export function compare(a: number, b: number): number {
 }
 
 /** Int32 */
-export type Int32 = number | null | undefined;
+export type Int32 = number | undefined;
 
 function _commaFormatNumber(num, groups, decimal, comma) {
-    var decimalPart = null;
+    var decimalPart: number | undefined = undefined;
     var decimalIndex = num.indexOf(decimal);
     if (decimalIndex > 0) {
         decimalPart = num.substr(decimalIndex);
@@ -158,11 +158,10 @@ function _commaFormatNumber(num, groups, decimal, comma) {
     return decimalPart ? s + decimalPart : s;
 }
 
-export function netFormatNumber(num: number, format?: string | null): string {
+export function netFormatNumber(num: number, format: string): string {
     var s = "";
     var precision = -1;
 
-    format = format || "";
     if (format.length > 1) {
         precision = parseInt(format.substr(1), 10);
     }

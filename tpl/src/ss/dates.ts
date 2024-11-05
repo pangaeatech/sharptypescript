@@ -49,7 +49,7 @@ export function today(): Date {
 }
 
 /** Formats the specified date using the format string. */
-export function formatDate(d: Date, format?: string | null): string {
+export function formatDate(d: Date, format?: string): string {
     if (!format || format == "i") {
         return d.toString();
     }
@@ -108,7 +108,7 @@ const DateFormatInfo = {
 
 const _formatRE = /'.*?[^\\]'|dddd|ddd|dd|d|MMMM|MMM|MM|M|yyyy|yy|y|hh|h|HH|H|mm|m|ss|s|tt|t|fff|ff|f|zzz|zz|z/g;
 
-export function netFormatDate(dt: Date, format?: string | null): string {
+export function netFormatDate(dt: Date, format?: string): string {
     if (!format) {
         return dt.toString();
     }

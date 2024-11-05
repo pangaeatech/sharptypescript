@@ -1,35 +1,29 @@
 import { isValue } from "./index";
 
-/** Returns whether or not the specified string is null or empty. */
-export function isNullOrEmptyString(val: string | undefined | null): boolean {
+/** Returns whether or not the specified string is undefined or empty. */
+export function isNullOrEmptyString(val?: string): boolean {
     return !val || !val.length;
 }
 
 const _formatRE = /\{\{|\}\}|\{[^}{]+\}/g;
 
 /** Formats the specified string with the specified numbered parameters. */
-export function formatString(format: string | undefined | null, ...values: Array<string | undefined | null>): string {
-    return (format || "").replace(_formatRE, function (m) {
+export function formatString(format: string, ...values: string[]): string {
+    return format.replace(_formatRE, function (m) {
         if (m === "{{" || m === "}}") {
             return m.charAt(0);
         }
 
         var index = parseInt(m.substr(1), 10);
-        return values[index] || "";
+        return values[index];
     });
 }
 
-export function regexpEscape(s: string | undefined | null): string {
-    return (s || "").replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+export function regexpEscape(s: string): string {
+    return s.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }
 
-export function netSplit(
-    s: string | undefined | null,
-    strings: Array<string | undefined | null>,
-    limit: number,
-    options?: number
-): string[] {
-    s = s || "";
+export function netSplit(s: string, strings: string[], limit: number, options?: number): string[] {
     const re = new RegExp(strings.map(regexpEscape).join("|"), "g");
     const res: string[] = [];
     var m;
@@ -53,7 +47,7 @@ export function netSplit(
     }
 }
 
-export function compareStrings(s1: string | undefined | null, s2: string | undefined | null, ignoreCase?: boolean) {
+export function compareStrings(s1: string, s2: string, ignoreCase?: boolean) {
     if (!isValue(s1)) {
         return isValue(s2) ? -1 : 0;
     }
@@ -71,9 +65,6 @@ export function compareStrings(s1: string | undefined | null, s2: string | undef
         }
     }
 
-    s1 = s1 || "";
-    s2 = s2 || "";
-
     if (s1 == s2) {
         return 0;
     }
@@ -86,25 +77,25 @@ export function compareStrings(s1: string | undefined | null, s2: string | undef
 }
 
 /** Returns whether or not the specified string starts with the given prefix. */
-export function startsWithString(value: string | undefined | null, prefix: string | undefined | null): boolean {
-    return (value || "").startsWith(prefix || "");
+export function startsWithString(value: string, prefix: string): boolean {
+    return value.startsWith(prefix);
 }
 
 /** Returns whether or not the specified string ends with the given suffix. */
-export function endsWithString(value: string | undefined | null, suffix: string | undefined | null): boolean {
-    return (value || "").endsWith(suffix || "");
+export function endsWithString(value: string, suffix: string): boolean {
+    return value.endsWith(suffix);
 }
 
-export function stringFromChar(ch: string | undefined | null, count: number): string {
-    var s = ch || "";
+export function stringFromChar(ch: string, count: number): string {
+    var s = ch;
     for (var i = 1; i < count; i++) {
-        s += ch || "";
+        s += ch;
     }
     return s;
 }
 
-export function htmlDecode(s: string | undefined | null): string {
-    return (s || "").replace(/&([^;]+);/g, function (_, e) {
+export function htmlDecode(s: string): string {
+    return s.replace(/&([^;]+);/g, function (_, e) {
         if (e[0] === "#") return String.fromCharCode(parseInt(e.substr(1), 10));
         switch (e) {
             case "quot":
@@ -123,8 +114,8 @@ export function htmlDecode(s: string | undefined | null): string {
     });
 }
 
-export function htmlEncode(s: string | undefined | null): string {
-    return (s || "")
+export function htmlEncode(s: string): string {
+    return s
         .replace(/&/g, "&amp;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;")
@@ -132,13 +123,12 @@ export function htmlEncode(s: string | undefined | null): string {
         .replace(/>/g, "&gt;");
 }
 
-export function jsEncode(s: string | undefined | null, q?: boolean) {
-    s = (s || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"');
+export function jsEncode(s: string, q?: boolean) {
+    s = s.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"');
     return q ? '"' + s + '"' : s;
 }
 
-export function padLeftString(s: string | undefined | null, totalWidth: number, ch?: number): string {
-    s = s || "";
+export function padLeftString(s: string, totalWidth: number, ch?: number): string {
     if (s.length < totalWidth) {
         return stringFromChar(String.fromCharCode(ch || 0x20), totalWidth - s.length) + s;
     }
@@ -146,8 +136,7 @@ export function padLeftString(s: string | undefined | null, totalWidth: number, 
     return s;
 }
 
-export function padRightString(s: string | undefined | null, totalWidth: number, ch?: number): string {
-    s = s || "";
+export function padRightString(s: string, totalWidth: number, ch?: number): string {
     if (s.length < totalWidth) {
         return s + stringFromChar(String.fromCharCode(ch || 0x20), totalWidth - s.length);
     }
@@ -155,20 +144,16 @@ export function padRightString(s: string | undefined | null, totalWidth: number,
     return s;
 }
 
-export function replaceAllString(
-    s: string | undefined | null,
-    oldValue: string | undefined | null,
-    newValue: string | undefined | null
-): string {
-    return (s || "").split(oldValue || "").join(newValue || "");
+export function replaceAllString(s: string, oldValue: string, newValue: string): string {
+    return s.split(oldValue).join(newValue);
 }
 
-export function parseXml(markup: string | undefined | null) {
+export function parseXml(markup: string) {
     try {
-        return new DOMParser().parseFromString(markup || "", "text/xml");
+        return new DOMParser().parseFromString(markup, "text/xml");
     } catch (ex) {}
 
-    return null;
+    return undefined;
 }
 
 export function isLower(c: number): boolean {
