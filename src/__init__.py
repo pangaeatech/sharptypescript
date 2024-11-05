@@ -1,7 +1,3 @@
-#!/usr/bin/python3
-# -.- coding: utf-8 -.-
-# -.- dependencies: Python 3.8+ -.-
-
 """
 Salt2Type
 
@@ -30,25 +26,4 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import sys
-from src import read_js, read_doc, add_doc_info, copy_tpl, gen_ts, gen_index
-
-if __name__ == "__main__":
-    if len(sys.argv) < 5 or len(sys.argv) > 7:
-        raise SystemExit("Usage: %s JSFILE XMLFILE OUTDIR NSNAME [IGNFILE] [IMPORTS]" % sys.argv[0])
-
-    [_, JS_FILE, XML_FILE, OUT_DIR, NS_NAME, BL_FILE, IMPORTS] = (sys.argv + [None, None])[:7]  # pylint: disable=unbalanced-tuple-unpacking
-
-    ASM_NAME, CLASSES, GLOBALS = read_js(JS_FILE, BL_FILE)
-    TYPES = read_doc(XML_FILE)
-    add_doc_info(CLASSES, TYPES)
-
-    if IMPORTS:
-        with open(IMPORTS, "r") as imp_fil:
-            EXTRA_IMPORTS = imp_fil.read().splitlines()
-    else:
-        EXTRA_IMPORTS = None
-
-    copy_tpl(OUT_DIR, ASM_NAME, NS_NAME)
-    gen_ts(OUT_DIR, CLASSES, EXTRA_IMPORTS)
-    gen_index(OUT_DIR, CLASSES, GLOBALS, EXTRA_IMPORTS)
+from .helper import read_js, read_doc, add_doc_info, copy_tpl, gen_ts, gen_index

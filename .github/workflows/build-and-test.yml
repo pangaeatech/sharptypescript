@@ -46,7 +46,15 @@ jobs:
 
       - run: poetry run black --check .
 
-      - run: poetry run pylint salt2type
+      - run: poetry run pylint salt2type */*.py
+
+      - name: Run unit tests
+        run: |
+          poetry run coverage run -m unittest test/*.py
+          poetry run coverage report --no-skip-covered --fail-under=10 src/*.py
+          poetry run coverage html --no-skip-covered src/*.py
+
+      - name: poetry run pdoc -o doc src
 
       - name: Set up Node
         uses: actions/setup-node@v3
