@@ -1,6 +1,6 @@
 import { padLeftString } from "./strings";
 
-export default class TimeSpan {
+class TimeSpan {
     ticks: number;
 
     constructor(t?: number) {
@@ -44,3 +44,5 @@ export default class TimeSpan {
         return result;
     }
 }
+
+export default TimeSpan;

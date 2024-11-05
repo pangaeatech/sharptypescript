@@ -52,7 +52,7 @@ However, if you need/wish to write your client-side code in TypeScript and your 
         - Methods/Properties are specified with thir classes (e.g. `package.subpackage.ClassName:MethodName`)
     - `IMPORTS` = An optional file containing additional import lines to be added to the header of every generated file.
         - Note: the string `{MAINDIR}` will be replaced with `./`, `../`, etc as necessary to referece the `OUTDIR`
-4. Post-Migration Validation and Cleanup
+4. Post-Migration Validation and Cleanup (fixing warnings and errors as you go):
     - `cd OUTDIR`
     - `npm install`
     - `npm run format:fix`

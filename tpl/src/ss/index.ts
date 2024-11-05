@@ -10,6 +10,8 @@ export { formatNumber, round, unbox, Nullable$1, NumberFormatInfo, compare, Int3
 export {
     Action,
     Delegate,
+    Func,
+    TypeOption,
     mkdel,
     delegateCombine,
     delegateRemove,

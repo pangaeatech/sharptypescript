@@ -476,26 +476,29 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"\bDateTime\b", "Date", raw_type)
     raw_type = re.sub(r"\bObject\b", "object", raw_type)
     raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)
+    raw_type = re.sub(r"\bjQueryEvent\b", "JQuery.Event", raw_type)
+    raw_type = re.sub(r"\bjQueryEventHandler\b", "JQuery.EventHandler", raw_type)
     raw_type = re.sub(r"\bdynamic\b", "any", raw_type)
     raw_type = re.sub(r"\bDelegate\b", "Action<void>", raw_type)
     raw_type = re.sub(r"^delegate (.*)$", r"Action<\1>", raw_type)
     raw_type = re.sub(r"(ss\.)?(Js)?Dictionary\<", r"Record<", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary$", r"Record<string,unknown>", raw_type)
     raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,unknown>\1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
-    if raw_type == "JsDictionary":
-        raw_type = "Dictionary<string, object>"
+    if raw_type in ("any", "unknown", "boolean", "string", "void"):
+        return raw_type
 
-    if raw_type == "object":
-        optional = True
+    if raw_type.endswith("[])") or raw_type.startswith("Array<"):
+        return raw_type
 
-    if raw_type == "string":
-        optional = False
+    if raw_type.startswith("Record<") or raw_type.startswith("TypeOption<"):
+        return raw_type
 
-    if optional:
-        return "%s | undefined" % raw_type
+    if raw_type in ("number", "Date") and not optional:
+        return raw_type
 
-    return raw_type
+    return "%s | undefined" % raw_type
 
 
 def read_doc(filename: str) -> List[ClassDef]:
@@ -825,6 +828,7 @@ def write_imports(
             donelist.append(item.name)
 
     out_file.write("import * as ss from '%s/ss';\n" % go_up)
+    out_file.write("import { Action, Delegate, Func, TypeOption } from '%s/ss/delegates';\n" % go_up)
 
     if extra_imports:
         for extra in extra_imports:

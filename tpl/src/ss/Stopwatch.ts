@@ -1,6 +1,6 @@
 import TimeSpan from "./TimeSpan";
 
-export default class Stopwatch {
+class Stopwatch {
     private static frequency = 1e3;
     private _stopTime = 0;
     private _startTime = 0;
@@ -50,3 +50,5 @@ export default class Stopwatch {
         this.start();
     }
 }
+
+export default Stopwatch;

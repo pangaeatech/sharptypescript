@@ -2,7 +2,7 @@ export interface Stringable {
     toString: () => string;
 }
 
-export default class StringBuilder {
+class StringBuilder {
     private _parts: string[];
 
     constructor(s?: string) {
@@ -43,3 +43,5 @@ export default class StringBuilder {
         return this._parts.join("");
     }
 }
+
+export default StringBuilder;
