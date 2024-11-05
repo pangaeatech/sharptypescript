@@ -703,12 +703,12 @@ def to_local_prop(name: str) -> str:
     return name[:1].lower() + name[1:]
 
 
-def prop_to_string(prop: PropDef, alwaysDef: Optional[bool] = False) -> str:
+def prop_to_string(prop: PropDef, always_def: Optional[bool] = False) -> str:
     """
     Generates a stringified version of the property for typescript
     """
     myval = prop.def_val
-    if alwaysDef and not myval:
+    if always_def and not myval:
         if not prop.typ:
             myval = "undefined"
         elif prop.typ == "boolean":
