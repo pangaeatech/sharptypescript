@@ -482,11 +482,14 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,unknown>\1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
-    if raw_type == "string" or raw_type == "object":
+    if raw_type == "object":
         optional = True
 
+    if raw_type == "string":
+        optional = False
+
     if optional:
-        return "%s | undefined | null" % raw_type
+        return "%s | undefined" % raw_type
 
     return raw_type
 
@@ -713,7 +716,13 @@ def prop_to_string(prop: PropDef, alwaysDef: Optional[bool] = False) -> str:
         elif prop.typ and prop.typ.endswith("[]"):
             myval = "[]"
         else:
-            myval = "null"
+            myval = "undefined"
+
+    if myval == "null":
+        myval = "undefined"
+
+    if myval == "undefined" and prop.typ == "string":
+        myval = '""'
 
     defval = " = %s" % myval if myval else ""
     typstr = ": %s" % (prop.typ or "any") if not defval or prop.typ else ""
@@ -773,7 +782,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]
                 else:
                     fil.write("\tconstructor%s(%s) {\n" % (gen, props))
                 for line in method.body:
-                    fil.write("\t%s\n" % line)
+                    fil.write("\t%s\n" % re.sub(r"\bnull\b", "undefined", line))
                 fil.write("\t}\n")
 
             fil.write("}\n")
@@ -823,7 +832,7 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_import
 
         fil.write("\n")
         for glob in globs:
-            fil.write("%s\n" % glob)
+            fil.write("%s\n" % re.sub(r"\bnull\b", "undefined", glob))
 
 
 ###################
