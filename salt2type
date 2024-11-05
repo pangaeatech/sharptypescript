@@ -836,7 +836,7 @@ def fix_body_line(line: str) -> str:
     Applies fixes to a body line of typescript code.
     """
     line = re.sub(r"\bnull\b", "undefined", line)
-    line = re.sub(r"^(\s*var [A-Za-z0-9$_]+) = [];\s*$", lambda m: f"{m.group(1)}: any[] = [];", line)
+    line = re.sub(r"^(\s*var [A-Za-z0-9$_]+) = \[\];\s*$", lambda m: f"{m.group(1)}: any[] = [];", line)
 
     return line
 
