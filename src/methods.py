@@ -484,4 +484,4 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_import
             fil.write("%s\n" % fix_body_line(glob))
 
         if ns_name:
-            fil.write(f"export default %s;" % ns_name)
+            fil.write("export default %s;" % ns_name)
