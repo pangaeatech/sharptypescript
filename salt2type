@@ -51,4 +51,4 @@ if __name__ == "__main__":
 
     copy_tpl(OUT_DIR, ASM_NAME, NS_NAME)
     gen_ts(OUT_DIR, CLASSES, EXTRA_IMPORTS)
-    gen_index(OUT_DIR, CLASSES, GLOBALS, EXTRA_IMPORTS)
+    gen_index(OUT_DIR, CLASSES, GLOBALS, EXTRA_IMPORTS, NS_NAME)

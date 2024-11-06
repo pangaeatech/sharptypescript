@@ -468,7 +468,7 @@ def gen_ts(out_dir: str, defs: List[ClassDef], extra_imports: Optional[List[str]
             fil.write("export default %s;" % item.name)
 
 
-def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_imports: Optional[List[str]] = None) -> None:
+def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_imports: Optional[List[str]] = None, ns_name: Optional[str] = None) -> None:
     """
     Generates the index.ts file exporting each known class in the specified output directory.
 
@@ -482,3 +482,6 @@ def gen_index(out_dir: str, defs: List[ClassDef], globs: List[str], extra_import
         fil.write("\n")
         for glob in globs:
             fil.write("%s\n" % fix_body_line(glob))
+
+        if ns_name:
+            fil.write(f"export default %s;" % ns_name)
