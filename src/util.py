@@ -30,9 +30,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import os, re, sys
+import re
 from xml.etree import ElementTree
-from typing import List, Tuple, Optional, TextIO, Set
+from typing import List, Optional, TextIO, Set
 from src.types import *
 
 

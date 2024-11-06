@@ -32,7 +32,7 @@ SOFTWARE.
 
 import os, re, sys
 from xml.etree import ElementTree
-from typing import List, Tuple, Optional, TextIO, Set
+from typing import List, Tuple, Optional
 from src.types import *
 from src.util import *
 

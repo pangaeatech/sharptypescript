@@ -1,4 +1,4 @@
-# pylint: disable=C0303,C0301,C0114,C0413,W0611
+# pylint: disable=C0303,C0301,C0114,C0413,W0611,C0116
 
 import os
 from unittest.mock import patch, mock_open, MagicMock
