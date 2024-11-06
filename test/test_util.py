@@ -30,8 +30,8 @@ class TestUtil(unittest.TestCase):
         mock_to_type.assert_any_call("param3")  # Called once with param3
 
         # Verify transformed line output
-        expected_result1 = "someMethod<TypeOf_param1>("
-        expected_result2 = "anotherMethod<TypeOf_param3>("
+        expected_result1 = "someMethod<TypeOf_param1>(param2)"
+        expected_result2 = "anotherMethod<TypeOf_param3>(param4)"
 
         self.assertEqual(result1, expected_result1)
         self.assertEqual(result2, expected_result2)
@@ -43,8 +43,8 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(to_type("float"), "number")
         self.assertEqual(to_type("JsDate"), "Date")
         self.assertEqual(to_type("DateTime"), "Date")
-        self.assertEqual(to_type("Object"), "object")
-        self.assertEqual(to_type("jQueryObject"), "JQuery")
+        self.assertEqual(to_type("Object"), "object | undefined")
+        self.assertEqual(to_type("jQueryObject"), "JQuery | undefined")
         self.assertEqual(to_type("dynamic"), "any")
 
     def test_collections(self):
@@ -61,8 +61,8 @@ class TestUtil(unittest.TestCase):
 
     def test_delegate_and_dynamic(self):
         # Test mappings for delegate and dynamic types
-        self.assertEqual(to_type("Delegate"), "Action<void>")
-        self.assertEqual(to_type("delegate int"), "Action<number>")
+        self.assertEqual(to_type("Delegate"), "Action<void> | undefined")
+        self.assertEqual(to_type("delegate int"), "Action<number> | undefined")
         self.assertEqual(to_type("dynamic"), "any")
 
     def test_complex_types(self):

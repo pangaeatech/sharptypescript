@@ -33,7 +33,7 @@ SOFTWARE.
 import os, re, sys
 from xml.etree import ElementTree
 from typing import List, Tuple, Optional, TextIO, Set
-from types import *
+from src.types import *
 
 
 def clean_line(line: str) -> str:

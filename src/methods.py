@@ -33,8 +33,8 @@ SOFTWARE.
 import os, re, sys
 from xml.etree import ElementTree
 from typing import List, Tuple, Optional, TextIO, Set
-from types import *
-from util import *
+from src.types import *
+from src.util import *
 
 
 def read_js(filename: str, ignfile: Optional[str]) -> Tuple[str, List[ClassDef], List[str]]:
