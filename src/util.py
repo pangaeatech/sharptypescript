@@ -140,8 +140,9 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"\b(int|float|double|long|short|byte|uint)\b", "number", raw_type)
     raw_type = re.sub(r"\b(ss\.)?(IList|List|IEnumerable|ICollection)\b", "Array", raw_type)
     raw_type = re.sub(r"\b(ss\.)?JsDate\b", "Date", raw_type)
+    raw_type = re.sub(r"\b(ss\.)?Int32\b", "number", raw_type)
     raw_type = re.sub(r"\bDateTime\b", "Date", raw_type)
-    raw_type = re.sub(r"\bObject\b", "object", raw_type)
+    raw_type = re.sub(r"\bObject\b", "any", raw_type)
     raw_type = re.sub(r"\bjQueryObject\b", "JQuery", raw_type)
     raw_type = re.sub(r"\bjQueryEvent\b", "JQuery.Event", raw_type)
     raw_type = re.sub(r"\bjQueryEventHandler\b", "JQuery.EventHandler", raw_type)
@@ -149,8 +150,8 @@ def to_type(raw_type: str) -> str:
     raw_type = re.sub(r"\bDelegate\b", "Action<void>", raw_type)
     raw_type = re.sub(r"^delegate (.*)$", r"Action<\1>", raw_type)
     raw_type = re.sub(r"(ss\.)?(Js)?Dictionary\<", r"Record<", raw_type)
-    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary$", r"Record<string,unknown>", raw_type)
-    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,unknown>\1", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary$", r"Record<string,any>", raw_type)
+    raw_type = re.sub(r"(ss\.)?(Js)?Dictionary([^<])", r"Record<string,any>\1", raw_type)
     raw_type = re.sub(r"^(sealed override|override|params|readonly|new|this|abstract|const) ", "", raw_type)
 
     if raw_type in ("any", "unknown", "boolean", "string", "void"):
@@ -175,7 +176,15 @@ def find_prop(items: List[PropDef], name: str) -> Optional[PropDef]:
     for item in items:
         if item.name.lower() == name.lower():
             return item
+        if item.name == "$" + name[:1].lower() + name[1:]:
+            return item
+        if name == "$" + item.name[:1].lower() + item.name[1:]:
+            return item
         if item.is_rest and re.match(r"^%s[1-9]$" % re.escape(name), item.name, re.IGNORECASE):
+            return item
+        if item.name.lower() == "$" + name.lower():
+            return item
+        if name.lower() == "$" + item.name.lower():
             return item
 
     return None
@@ -319,5 +328,9 @@ def fix_body_line(line: str) -> str:
     """
     line = re.sub(r"\bnull\b", "undefined", line)
     line = re.sub(r"^(\s*var [A-Za-z0-9$_]+) = \[\];\s*$", lambda m: f"{m.group(1)}: any[] = [];", line)
+
+    line = re.sub(r"\b(ss\.)?(IList|List|IEnumerable|ICollection)\b", "Array", line)
+    line = re.sub(r"\b(ss\.)?JsDate\b", "Date", line)
+    line = re.sub(r"\b(ss\.)?Int32\b", "number", line)
 
     return line

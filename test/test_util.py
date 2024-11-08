@@ -44,7 +44,7 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(to_type("float"), "number")
         self.assertEqual(to_type("JsDate"), "Date")
         self.assertEqual(to_type("DateTime"), "Date")
-        self.assertEqual(to_type("Object"), "object | undefined")
+        self.assertEqual(to_type("Object"), "any")
         self.assertEqual(to_type("jQueryObject"), "JQuery | undefined")
         self.assertEqual(to_type("dynamic"), "any")
 
