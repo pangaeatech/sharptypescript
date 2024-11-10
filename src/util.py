@@ -328,6 +328,8 @@ def fix_body_line(line: str) -> str:
     """
     line = re.sub(r"\bnull\b", "undefined", line)
     line = re.sub(r"^(\s*var [A-Za-z0-9$_]+) = \[\];\s*$", lambda m: f"{m.group(1)}: any[] = [];", line)
+    line = re.sub(r"^(\s*var [A-Za-z0-9$_]+) = \{\};\s*$", lambda m: f"{m.group(1)}: any = {{}};", line)
+    line = re.sub(r"^(\s*var [A-Za-z0-9$_]+) = \$.extend\(\{\}, ", lambda m: f"{m.group(1)}: any = $.extend({{}}, ;", line)
 
     line = re.sub(r"\b(ss\.)?(IList|List|IEnumerable|ICollection)\b", "Array", line)
     line = re.sub(r"\b(ss\.)?JsDate\b", "Date", line)
