@@ -62,13 +62,13 @@ However, if you need/wish to write your client-side code in TypeScript and your 
 
 ### Tested Versions
 
--   Doxygen 1.8.17
--   MSBuild 14.0
--   nodejs 16.19.1
--   npm 8.1.0
--   Python 3.8.10
--   Saltarelle.Compiler 2.7.0
--   xsltproc 1.1.34
+- Doxygen 1.8.17
+- MSBuild 14.0
+- nodejs 16.19.1
+- npm 8.1.0
+- Python 3.8.10
+- Saltarelle.Compiler 2.7.0
+- xsltproc 1.1.34
 
 ### Limitations
 
