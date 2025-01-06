@@ -5,6 +5,7 @@ description = "Saltarelle to TypeScript Migration Tool"
 authors = ["Pangaea Information Technologies, Ltd."]
 readme = "README.md"
 repository = "https://github.com/pangaeatech/salt2type"
+package-mode = false
 
 [tool.black]
 line-length = 150
